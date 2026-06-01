@@ -9,6 +9,10 @@ export interface Patient {
   status: "estable" | "observacion" | "critico";
   initials: string;
   avatarColor: string;
+  phone?: string;      
+  location?: string;   
+  bloodType?: string;  
+  allergies?: string;  
 }
 
 const statusConfig = {
