@@ -1,0 +1,63 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build-and-healthcheck:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: "file:./dev.db"
+      JWT_SECRET: "test_jwt_secret_key_for_ci_environments_123456"
+      ENCRYPTION_KEY: "development_default_secure_key_123456"
+      NODE_ENV: "test"
+      PORT: 3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Sync database schema
+        working-directory: backend
+        run: npx prisma db push --accept-data-loss
+
+      - name: Run linter
+        working-directory: backend
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: backend
+        run: npm test
+
+      - name: Start server
+        working-directory: backend
+        run: |
+          nohup npm start >server.log 2>&1 &
+          echo $! > /tmp/backend_pid
+          sleep 3
+
+      - name: Health check
+        run: |
+          curl --fail http://localhost:3000/health
+
+      - name: Stop server
+        run: |
+          kill $(cat /tmp/backend_pid) || true

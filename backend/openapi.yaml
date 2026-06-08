@@ -1,0 +1,450 @@
+openapi: 3.0.3
+info:
+  title: CliniData Backend API
+  version: 1.0.0
+  description: API mínima (MVP) para CliniData — autenticación, usuarios, pacientes, consultas y auditoría. Seguridad por JWT Bearer.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: health
+  - name: auth
+  - name: users
+  - name: patients
+  - name: consultas
+  - name: dashboard
+  - name: auditorias
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: OK
+
+  /api/auth/register:
+    post:
+      tags: [auth]
+      summary: Registrar usuario (demo/admin puede crear médicos)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegister'
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400': { description: Bad request }
+
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Login — devuelve JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401': { description: Unauthorized }
+
+  /api/users/me:
+    get:
+      tags: [users]
+      summary: Obtener usuario autenticado
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401': { description: Unauthorized }
+
+  /api/users:
+    get:
+      tags: [users]
+      summary: Listar médicos (ADMIN)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '403': { description: Forbidden }
+
+  /api/users/{id}/status:
+    put:
+      tags: [users]
+      summary: Activar/desactivar médico (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                activo:
+                  type: boolean
+      responses:
+        '200': { description: OK }
+        '400': { description: Bad request }
+
+  /api/patients:
+    get:
+      tags: [patients]
+      summary: Listar pacientes (MEDICO)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de pacientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Patient'
+    post:
+      tags: [patients]
+      summary: Crear paciente (MEDICO)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientCreate'
+      responses:
+        '201':
+          description: Paciente creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+
+  /api/patients/{id}:
+    get:
+      tags: [patients]
+      summary: Obtener paciente por id (MEDICO + ReBAC)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paciente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+        '403': { description: Forbidden }
+        '404': { description: Not found }
+    put:
+      tags: [patients]
+      summary: Actualizar paciente (MEDICO + ReBAC)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientUpdate'
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [patients]
+      summary: Borrar paciente (ADMIN)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204': { description: No Content }
+        '403': { description: Forbidden }
+
+  /api/consultas:
+    post:
+      tags: [consultas]
+      summary: Crear consulta (MEDICO)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsultaCreate'
+      responses:
+        '201':
+          description: Consulta creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Consulta'
+
+  /api/consultas/paciente/{pacienteId}:
+    get:
+      tags: [consultas]
+      summary: Historial de un paciente (MEDICO + ReBAC)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: pacienteId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de consultas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Consulta'
+
+  /api/consultas/{id}/colaboradores:
+    post:
+      tags: [consultas]
+      summary: Agregar colaborador a consulta (MEDICO)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                colaboradorId:
+                  type: string
+      responses:
+        '200': { description: OK }
+
+  /api/consultas/{id}/notas:
+    post:
+      tags: [consultas]
+      summary: Agregar nota clínica (MEDICO)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotaCreate'
+      responses:
+        '201': { description: Nota creada }
+
+  /api/dashboard:
+    get:
+      tags: [dashboard]
+      summary: Estadísticas (ADMIN o MEDICO)
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: Stats object }
+
+  /api/auditorias:
+    get:
+      tags: [auditorias]
+      summary: Listar auditorías (ADMIN)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista auditorías
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Auditoria'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    AuthRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    AuthRegister:
+      type: object
+      required: [email, password, nombre, apellido, rol, clinicaId]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        nombre:
+          type: string
+        apellido:
+          type: string
+        rol:
+          type: string
+          enum: [ADMIN, MEDICO, USER]
+        clinicaId:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        nombre: { type: string }
+        apellido: { type: string }
+        rol:
+          type: string
+          enum: [ADMIN, MEDICO, USER]
+        activo: { type: boolean }
+        clinicaId: { type: string }
+    Patient:
+      type: object
+      properties:
+        id: { type: string }
+        identificador: { type: string }
+        nombre: { type: string }
+        apellido: { type: string }
+        fechaNacimiento:
+          type: string
+          format: date
+        sexo: { type: string }
+        telefono: { type: string }
+    PatientCreate:
+      type: object
+      required: [identificador, nombre, apellido]
+      properties:
+        identificador: { type: string }
+        nombre: { type: string }
+        apellido: { type: string }
+        fechaNacimiento:
+          type: string
+          format: date
+        sexo: { type: string }
+        telefono: { type: string }
+    PatientUpdate:
+      type: object
+      properties:
+        nombre: { type: string }
+        apellido: { type: string }
+        telefono: { type: string }
+    ConsultaCreate:
+      type: object
+      required: [pacienteId, fecha, motivo]
+      properties:
+        pacienteId: { type: string }
+        fecha:
+          type: string
+          format: date-time
+        motivo: { type: string }
+        sintomas: { type: string }
+        observaciones: { type: string }
+    Consulta:
+      type: object
+      properties:
+        id: { type: string }
+        pacienteId: { type: string }
+        medicoId: { type: string }
+        fecha:
+          type: string
+          format: date-time
+        motivo: { type: string }
+        sintomas: { type: string }
+        observaciones: { type: string }
+    NotaCreate:
+      type: object
+      required: [texto]
+      properties:
+        texto: { type: string }
+    Auditoria:
+      type: object
+      properties:
+        id: { type: string }
+        accion: { type: string }
+        detalles: { type: string }
+        usuarioId: { type: string }
+        ipAddress: { type: string }
+        creadoEn:
+          type: string
+          format: date-time

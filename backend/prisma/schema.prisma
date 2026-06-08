@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Clinica {
+  id        String     @id @default(uuid())
+  nombre    String
+  direccion String?
+  telefono  String?
+  creadoEn  DateTime   @default(now())
+  usuarios  Usuario[]
+  pacientes Paciente[]
+}
+
+model Usuario {
+  id                   String                 @id @default(uuid())
+  email                String                 @unique
+  password             String                 // Contraseña cifrada con bcrypt
+  nombre               String
+  apellido             String
+  rol                  String                 // "ADMIN" o "MEDICO"
+  activo               Boolean                @default(true)
+  clinicaId            String
+  clinica              Clinica                @relation(fields: [clinicaId], references: [id])
+  consultasAtendidas   Consulta[]             @relation("MedicoConsulta")
+  notasCreadas         NotaClinica[]
+  auditorias           Auditoria[]
+  colaboraciones       ColaboradorConsulta[]
+  pacientesPrincipales Paciente[]             @relation("MedicoPrincipalPacientes")
+  creadoEn             DateTime               @default(now())
+}
+
+model Paciente {
+  id                     String     @id @default(uuid())
+  nombre                 String     // Cifrado con AES-256-GCM
+  apellido               String     // Cifrado con AES-256-GCM
+  fechaNacimiento        DateTime?  // Texto plano (para cálculo de edades)
+  genero                 String?    // Texto plano: "MASCULINO", "FEMENINO", "OTRO" (para analíticas)
+  documentoIdentidad     String     @unique // Cifrado con AES-256-GCM (DNI real o NHC autogenerado)
+  documentoIdentidadHash String     @unique // Hash (Blind Index) de búsqueda
+  telefono               String?    // Cifrado con AES-256-GCM
+  email                  String?    // Cifrado con AES-256-GCM
+  contactoEmergencia     String?
+  telefonoEmergencia     String?
+  nombreTutor            String?    // Cifrado con AES-256-GCM (Para menores sin DNI)
+  dniTutor               String?    // Cifrado con AES-256-GCM (Para menores sin DNI)
+  clinicaId              String
+  clinica                Clinica    @relation(fields: [clinicaId], references: [id])
+  medicoPrincipalId      String
+  medicoPrincipal        Usuario    @relation("MedicoPrincipalPacientes", fields: [medicoPrincipalId], references: [id])
+  consultas              Consulta[]
+  creadoEn               DateTime   @default(now())
+}
+
+model Consulta {
+  id                 String                 @id @default(uuid())
+  fecha              DateTime               @default(now()) // Texto plano (para análisis de flujos)
+  motivo             String                 // Cifrado con AES-256-GCM
+  sintomas           String?                // Cifrado con AES-256-GCM
+  presionArterial    String?
+  temperatura        Float?
+  frecuenciaCardiaca Int?
+  peso               Float?                 // en kg
+  observaciones      String?                // Cifrado con AES-256-GCM
+  pacienteId         String
+  paciente           Paciente               @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId           String
+  medico             Usuario                @relation("MedicoConsulta", fields: [medicoId], references: [id])
+  diagnosticos       ConsultaDiagnostico[]
+  tratamientos       Tratamiento[]
+  notasClinicas      NotaClinica[]
+  colaboradores      ColaboradorConsulta[]
+}
+
+model Diagnostico {
+  id          String                 @id @default(uuid())
+  codigo      String                 @unique // Código CIE-10 o interno (Texto plano para analíticas)
+  descripcion String                 // Cifrado con AES-256-GCM
+  consultas   ConsultaDiagnostico[]
+}
+
+model ConsultaDiagnostico {
+  id            String      @id @default(uuid())
+  consultaId    String
+  consulta      Consulta    @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  diagnosticoId String
+  diagnostico   Diagnostico @relation(fields: [diagnosticoId], references: [id])
+
+  @@unique([consultaId, diagnosticoId])
+}
+
+model Tratamiento {
+  id           String   @id @default(uuid())
+  medicamento  String   // Cifrado con AES-256-GCM
+  dosis        String   // Cifrado con AES-256-GCM
+  frecuencia   String   // Cifrado con AES-256-GCM
+  duracion     String   // Cifrado con AES-256-GCM
+  indicaciones String?  // Cifrado con AES-256-GCM
+  consultaId   String
+  consulta     Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+}
+
+model NotaClinica {
+  id         String   @id @default(uuid())
+  contenido  String   // Cifrado con AES-256-GCM
+  creadoEn   DateTime @default(now())
+  consultaId String
+  consulta   Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  autorId    String
+  autor      Usuario  @relation(fields: [autorId], references: [id])
+}
+
+model ColaboradorConsulta {
+  id         String   @id @default(uuid())
+  consultaId String
+  consulta   Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  medicoId   String
+  medico     Usuario  @relation(fields: [medicoId], references: [id])
+  creadoEn   DateTime @default(now())
+
+  @@unique([consultaId, medicoId])
+}
+
+model Auditoria {
+  id        String   @id @default(uuid())
+  accion    String   // Ej. "LOGIN", "CREAR_PACIENTE", "VER_HISTORIAL"
+  detalles  String?  // Ej. "Paciente ID: 123"
+  ipAddress String?
+  fecha     DateTime @default(now())
+  usuarioId String?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+}
