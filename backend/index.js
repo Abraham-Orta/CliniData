@@ -77,9 +77,10 @@ app.get('/health', (req, res) => {
 // Manejador global de errores
 app.use(errorHandler);
 
-// --- CAPA 2 SEGURIDAD: Validación de JWT_SECRET al arrancar ---
+// --- CAPA 2 SEGURIDAD: Validación de JWT_SECRET y ENCRYPTION_KEY al arrancar ---
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 if (!JWT_SECRET || JWT_SECRET === 'change_this_secret') {
   if (process.env.NODE_ENV === 'production') {
@@ -88,6 +89,17 @@ if (!JWT_SECRET || JWT_SECRET === 'change_this_secret') {
   } else {
     console.warn('WARNING: JWT_SECRET is using the default development secret. Change it in production.');
   }
+}
+
+if (!ENCRYPTION_KEY) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('CRITICAL ERROR: ENCRYPTION_KEY must be set in production!');
+    process.exit(1);
+  } else {
+    console.warn('WARNING: ENCRYPTION_KEY is not set. Encrypt/decrypt operations will fail or be insecure in production.');
+  }
+} else if (ENCRYPTION_KEY.length < 32) {
+  console.warn('WARNING: ENCRYPTION_KEY length is less than 32 characters; consider using a 32-byte key for AES-256.');
 }
 
 if (require.main === module) {

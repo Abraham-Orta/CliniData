@@ -18,7 +18,7 @@ const getAllPatients = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
-    const search = req.query.search || '';
+    const search = (req.query.search || '').trim();
     const medicoId = req.userId;
     const rol = req.userRole;
 
@@ -28,6 +28,7 @@ const getAllPatients = async (req, res, next) => {
       });
     }
 
+    // Base ReBAC access query
     const accessQuery = {
       OR: [
         { medicoPrincipalId: medicoId },
@@ -36,27 +37,48 @@ const getAllPatients = async (req, res, next) => {
       ]
     };
 
+    // Optional filters
+    const filters = {};
+    if (req.query.genero) {
+      filters.genero = req.query.genero;
+    }
+    if (req.query.fechaNacimiento) {
+      const d = new Date(req.query.fechaNacimiento);
+      if (!Number.isNaN(d.getTime())) {
+        // Normalize to date (Prisma will handle date types)
+        filters.fechaNacimiento = d;
+      }
+    }
+
+    const baseWhere = { AND: [accessQuery] };
+    if (Object.keys(filters).length) baseWhere.AND.push(filters);
+
     let patients = [];
     let total = 0;
 
     if (search) {
+      // Try document (blind index) match first - fast and exact
       const searchDniHash = generateBlindIndex(search);
       const matchedPatient = await prisma.paciente.findFirst({
-        where: { AND: [accessQuery, { documentoIdentidadHash: searchDniHash }] }
+        where: { AND: [baseWhere, { documentoIdentidadHash: searchDniHash }] }
       });
 
       if (matchedPatient) {
         patients = [decryptPatient(matchedPatient)];
         total = 1;
       } else {
-        const allAccessible = await prisma.paciente.findMany({ where: accessQuery, orderBy: { creadoEn: 'desc' } });
+        // No exact doc match: search by nombre/apellido in decrypted data.
+        // To avoid decrypting entire DB, restrict by baseWhere (access + filters) and cap results to a reasonable max.
+        const MAX_DECRYPT = 1000; // safety cap
+        const allAccessible = await prisma.paciente.findMany({ where: baseWhere, orderBy: { creadoEn: 'desc' }, take: MAX_DECRYPT });
 
         const decrypted = allAccessible.map(decryptPatient);
         const searchTerm = search.toLowerCase();
         const filtered = decrypted.filter(p => {
           const nombre = p.nombre ? p.nombre.toLowerCase() : '';
           const apellido = p.apellido ? p.apellido.toLowerCase() : '';
-          return nombre.includes(searchTerm) || apellido.includes(searchTerm);
+          const documento = p.documentoIdentidad ? p.documentoIdentidad.toLowerCase() : '';
+          return nombre.includes(searchTerm) || apellido.includes(searchTerm) || documento.includes(searchTerm);
         });
 
         total = filtered.length;
@@ -64,10 +86,11 @@ const getAllPatients = async (req, res, next) => {
         patients = filtered.slice(startIndex, startIndex + limit);
       }
     } else {
+      // No free-text search: apply pagination server-side using baseWhere
       const skip = (page - 1) * limit;
       const [rows, count] = await Promise.all([
-        prisma.paciente.findMany({ where: accessQuery, skip, take: limit, orderBy: { creadoEn: 'desc' } }),
-        prisma.paciente.count({ where: accessQuery })
+        prisma.paciente.findMany({ where: baseWhere, skip, take: limit, orderBy: { creadoEn: 'desc' } }),
+        prisma.paciente.count({ where: baseWhere })
       ]);
 
       patients = rows.map(decryptPatient);
