@@ -1,22 +1,72 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Lock, Eye, EyeOff, ShieldCheck, ChevronRight } from "lucide-react";
+import { useAuth } from "./context/AuthContext";
 
-export function LoginCard({ onLogin }: { onLogin: () => void }) {
+export function LoginCard() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSsoLoading, setIsSsoLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setIsLoading(true);
     
-    // Simula la validación en el servidor
+    // Simula la validación restrictiva en el servidor
     setTimeout(() => {
       setIsLoading(false);
-      onLogin(); // Ejecuta la función del padre y cambia la pantalla
-    }, 1500); // Lo bajé a 1.5 segundos para que la demostración sea más ágil
+      
+      if (password.length < 6) {
+        setError("Credenciales inválidas. Verifica tu contraseña.");
+        return;
+      }
+      
+      if (Math.random() < 0.15) {
+        setError("Error de conexión con el directorio activo. Inténtalo de nuevo.");
+        return;
+      }
+
+      // Mock user object
+      const user = {
+        id: "dr-rachel-kim",
+        name: "Dr. Rachel Kim",
+        email: email,
+        role: "admin",
+        specialty: "Medicina Interna"
+      };
+
+      // Create a mock token
+      const mockToken = "mock_jwt_token_" + Date.now();
+      
+      login(mockToken, user);
+    }, 1500); 
+  };
+
+  const handleSsoClick = () => {
+    setError(null);
+    setIsSsoLoading(true);
+    setTimeout(() => {
+      setIsSsoLoading(false);
+      if (Math.random() < 0.15) {
+        setError("Servicio SSO no disponible en este momento.");
+        return;
+      }
+      
+      const user = {
+        id: "dr-rachel-kim",
+        name: "Dr. Rachel Kim",
+        email: "rachel.kim@clinidata.app",
+        role: "admin",
+        specialty: "Medicina Interna"
+      };
+      
+      login("mock_sso_jwt_token_" + Date.now(), user);
+    }, 1800);
   };
 
   return (
@@ -137,6 +187,13 @@ export function LoginCard({ onLogin }: { onLogin: () => void }) {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            {/* Error Banner */}
+            {error && (
+              <div className="p-3 rounded-lg text-sm font-semibold text-red-600 bg-red-50 border border-red-100 animate-in fade-in slide-in-from-top-1">
+                {error}
+              </div>
+            )}
+
             {/* Email field */}
             <div className="flex flex-col gap-2">
               <label
@@ -185,12 +242,13 @@ export function LoginCard({ onLogin }: { onLogin: () => void }) {
                   id="email"
                   type="email"
                   value={email}
+                  disabled={isLoading || isSsoLoading}
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setFocusedField("email")}
                   onBlur={() => setFocusedField(null)}
                   placeholder="dr.apellido@clinica.com"
                   required
-                  className="w-full bg-transparent outline-none pl-11 pr-4 py-3.5"
+                  className="w-full bg-transparent outline-none pl-11 pr-4 py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     fontSize: "15px",
                     fontWeight: 400,
@@ -256,12 +314,13 @@ export function LoginCard({ onLogin }: { onLogin: () => void }) {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
+                  disabled={isLoading || isSsoLoading}
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setFocusedField("password")}
                   onBlur={() => setFocusedField(null)}
                   placeholder="••••••••••••"
                   required
-                  className="w-full bg-transparent outline-none pl-11 pr-12 py-3.5"
+                  className="w-full bg-transparent outline-none pl-11 pr-12 py-3.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     fontSize: "15px",
                     fontWeight: 400,
@@ -290,7 +349,8 @@ export function LoginCard({ onLogin }: { onLogin: () => void }) {
               <input
                 type="checkbox"
                 id="remember"
-                className="rounded"
+                disabled={isLoading || isSsoLoading}
+                className="rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   width: "16px",
                   height: "16px",
@@ -395,34 +455,44 @@ export function LoginCard({ onLogin }: { onLogin: () => void }) {
 
           {/* SSO Button */}
           <button
-            className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3 transition-all duration-200"
+            onClick={handleSsoClick}
+            disabled={isLoading || isSsoLoading}
+            className="w-full flex items-center justify-center gap-2.5 rounded-xl py-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               border: "1.5px solid #E2E8F0",
               backgroundColor: "#ffffff",
               fontSize: "14px",
               fontWeight: 500,
               color: "#334155",
-              cursor: "pointer",
+              cursor: (isLoading || isSsoLoading) ? "not-allowed" : "pointer",
             }}
             onMouseEnter={(e) => {
+              if (isLoading || isSsoLoading) return;
               (e.currentTarget as HTMLButtonElement).style.borderColor = "#0B5394";
               (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#F8FAFC";
             }}
             onMouseLeave={(e) => {
+              if (isLoading || isSsoLoading) return;
               (e.currentTarget as HTMLButtonElement).style.borderColor = "#E2E8F0";
               (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#ffffff";
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <rect width="18" height="18" rx="4" fill="#F1F5F9" />
-              <path
-                d="M9 4.5L13.5 7.5v3L9 13.5 4.5 10.5v-3L9 4.5z"
-                stroke="#0B5394"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-              />
-              <circle cx="9" cy="9" r="1.5" fill="#0E7490" />
-            </svg>
+            {isSsoLoading ? (
+              <svg className="animate-spin" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="7" stroke="#0B5394" strokeWidth="2" strokeDasharray="10 10"/>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect width="18" height="18" rx="4" fill="#F1F5F9" />
+                <path
+                  d="M9 4.5L13.5 7.5v3L9 13.5 4.5 10.5v-3L9 4.5z"
+                  stroke="#0B5394"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+                <circle cx="9" cy="9" r="1.5" fill="#0E7490" />
+              </svg>
+            )}
             Continuar con SSO / Directorio Activo
           </button>
         </div>
