@@ -1,3 +1,4 @@
+/* eslint-disable node/no-unpublished-require, no-unused-vars */
 const request = require('supertest');
 const app = require('../index');
 const prisma = require('../src/config/database');

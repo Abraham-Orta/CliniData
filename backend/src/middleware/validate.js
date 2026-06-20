@@ -1,5 +1,3 @@
-const { z } = require('zod');
-
 module.exports = (schema, opts = {}) => {
   const partial = Boolean(opts && opts.partial);
   const s = partial && typeof schema?.partial === 'function' ? schema.partial() : schema;

@@ -322,7 +322,7 @@ const uploadAttachment = async (req, res, next) => {
         ipAddress: req.ip || '127.0.0.1',
         usuarioId: req.userId
       }
-    }).catch(() => {});
+    }).catch(() => { /* ignore audit failures */ });
 
     res.status(201).json({ id: adjunto.id, creadoEn: adjunto.creadoEn });
   } catch (error) {
@@ -353,7 +353,7 @@ const downloadAttachment = async (req, res, next) => {
 
     const originalName = decrypt(adjunto.nombre);
     res.setHeader('Content-Type', adjunto.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${originalName.replace(/\"/g, '')}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${originalName.replace(/"/g, '')}"`);
 
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);

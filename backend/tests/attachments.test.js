@@ -1,9 +1,9 @@
+/* eslint-disable node/no-unpublished-require, no-unused-vars, no-empty */
 const request = require('supertest');
 const app = require('../index');
 const prisma = require('../src/config/database');
 const fs = require('fs');
 const path = require('path');
-const { decrypt } = require('../src/utils/securityHelper');
 
 const tmpDir = path.join(__dirname, 'tmp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });

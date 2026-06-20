@@ -1,3 +1,4 @@
+/* eslint-disable node/no-unpublished-require, no-unused-vars */
 const { encrypt, decrypt, generateBlindIndex } = require('../src/utils/securityHelper');
 const prisma = require('../src/config/database');
 
