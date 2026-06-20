@@ -1,3 +1,4 @@
+import React from "react";
 import { Calendar, ChevronRight } from "lucide-react";
 
 export interface Patient {
@@ -24,6 +25,7 @@ const statusConfig = {
 interface PatientCardProps {
   patient: Patient;
   onClick: (patient: Patient) => void;
+  key?: React.Key;
 }
 
 export function PatientCard({ patient, onClick }: PatientCardProps) {
