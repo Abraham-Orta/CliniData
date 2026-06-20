@@ -3,11 +3,16 @@ const {
   createConsulta,
   getPacienteHistorial,
   addColaborador,
-  createNotaClinica
+  createNotaClinica,
+  uploadAttachment,
+  listAttachments,
+  downloadAttachment,
+  deleteAttachment
 } = require('../controllers/consultaController');
 const authMiddleware = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
-const { validatePatientAccess } = require('../middleware/accessMiddleware');
+const { validatePatientAccess, validateConsultaAccess } = require('../middleware/accessMiddleware');
+const upload = require('../config/multer');
 
 const router = express.Router();
 
@@ -23,5 +28,11 @@ router.get('/paciente/:pacienteId', authorize(['MEDICO']), validatePatientAccess
 // Acciones secundarias en consultas creadas
 router.post('/:id/colaboradores', authorize(['MEDICO']), addColaborador);
 router.post('/:id/notas', authorize(['MEDICO']), createNotaClinica);
+
+// Endpoints de adjuntos
+router.post('/:id/attachments', authorize(['MEDICO']), validateConsultaAccess, upload.single('file'), uploadAttachment);
+router.get('/:id/attachments', authorize(['MEDICO']), validateConsultaAccess, listAttachments);
+router.get('/:id/attachments/:attachmentId', authorize(['MEDICO']), validateConsultaAccess, downloadAttachment);
+router.delete('/:id/attachments/:attachmentId', authorize(['MEDICO']), validateConsultaAccess, deleteAttachment);
 
 module.exports = router;

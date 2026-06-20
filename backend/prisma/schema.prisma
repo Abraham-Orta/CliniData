@@ -78,6 +78,7 @@ model Consulta {
   tratamientos       Tratamiento[]
   notasClinicas      NotaClinica[]
   colaboradores      ColaboradorConsulta[]
+  adjuntos           Adjunto[]
 }
 
 model Diagnostico {
@@ -137,4 +138,15 @@ model Auditoria {
   fecha     DateTime @default(now())
   usuarioId String?
   usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+}
+
+model Adjunto {
+  id         String   @id @default(uuid())
+  nombre     String
+  ruta       String
+  mimeType   String
+  size       Int
+  consultaId String
+  consulta   Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  creadoEn   DateTime @default(now())
 }

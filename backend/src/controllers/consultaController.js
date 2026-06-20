@@ -1,6 +1,8 @@
 const prisma = require('../config/database');
 const { consultaSchema, notaClinicaSchema } = require('../utils/consultaValidators');
 const { encrypt, decrypt } = require('../utils/securityHelper');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Registrar una nueva consulta médica para un paciente, con diagnósticos, tratamientos y colaboradores opcionales.
@@ -146,7 +148,8 @@ const getPacienteHistorial = async (req, res, next) => {
               select: { id: true, nombre: true, apellido: true, email: true }
             }
           }
-        }
+        },
+        adjuntos: true
       },
       orderBy: { fecha: 'desc' }
     });
@@ -172,7 +175,8 @@ const getPacienteHistorial = async (req, res, next) => {
       notasClinicas: c.notasClinicas ? c.notasClinicas.map(n => ({
         ...n,
         contenido: n.contenido ? decrypt(n.contenido) : null
-      })) : []
+      })) : [],
+      adjuntos: c.adjuntos ? c.adjuntos.map(a => ({ id: a.id, mimeType: a.mimeType, size: a.size, creadoEn: a.creadoEn })) : []
     }));
 
     res.json(result);
@@ -290,16 +294,111 @@ const createNotaClinica = async (req, res, next) => {
   }
 };
 
-module.exports = {
-  createConsulta,
-  getPacienteHistorial,
-  addColaborador,
-  createNotaClinica
+/**
+ * Adjuntos: subir, listar, descargar y eliminar
+ */
+const uploadAttachment = async (req, res, next) => {
+  try {
+    const consultaId = req.params.id;
+    if (!req.file) return res.status(400).json({ error: 'Archivo no proporcionado.' });
+
+    const originalName = req.file.originalname;
+    const storedPath = req.file.path || path.join(__dirname, '../../uploads', req.file.filename);
+
+    const adjunto = await prisma.adjunto.create({
+      data: {
+        nombre: encrypt(originalName),
+        ruta: storedPath,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        consulta: { connect: { id: consultaId } }
+      }
+    });
+
+    await prisma.auditoria.create({
+      data: {
+        accion: 'SUBIR_ADJUNTO',
+        detalles: `Médico ID ${req.userId} subió adjunto ID ${adjunto.id} a consulta ID ${consultaId}`,
+        ipAddress: req.ip || '127.0.0.1',
+        usuarioId: req.userId
+      }
+    }).catch(() => {});
+
+    res.status(201).json({ id: adjunto.id, creadoEn: adjunto.creadoEn });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const listAttachments = async (req, res, next) => {
+  try {
+    const consultaId = req.params.id;
+    const adjuntos = await prisma.adjunto.findMany({ where: { consultaId } });
+
+    const mapped = adjuntos.map(a => ({ id: a.id, mimeType: a.mimeType, size: a.size, creadoEn: a.creadoEn }));
+    res.json(mapped);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const downloadAttachment = async (req, res, next) => {
+  try {
+    const { id: consultaId, attachmentId } = req.params;
+    const adjunto = await prisma.adjunto.findUnique({ where: { id: attachmentId } });
+    if (!adjunto || adjunto.consultaId !== consultaId) return res.status(404).json({ error: 'Adjunto no encontrado.' });
+
+    const filePath = adjunto.ruta;
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Archivo físico no encontrado.' });
+
+    const originalName = decrypt(adjunto.nombre);
+    res.setHeader('Content-Type', adjunto.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${originalName.replace(/\"/g, '')}"`);
+
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteAttachment = async (req, res, next) => {
+  try {
+    const { id: consultaId, attachmentId } = req.params;
+    const adjunto = await prisma.adjunto.findUnique({ where: { id: attachmentId } });
+    if (!adjunto || adjunto.consultaId !== consultaId) return res.status(404).json({ error: 'Adjunto no encontrado.' });
+
+    // Eliminar archivo físico
+    try {
+      if (fs.existsSync(adjunto.ruta)) fs.unlinkSync(adjunto.ruta);
+    } catch (e) {
+      console.error('Error eliminando archivo físico:', e.message);
+    }
+
+    await prisma.adjunto.delete({ where: { id: attachmentId } });
+
+    await prisma.auditoria.create({
+      data: {
+        accion: 'ELIMINAR_ADJUNTO',
+        detalles: `Médico ID ${req.userId} eliminó adjunto ID ${attachmentId} de consulta ID ${consultaId}`,
+        ipAddress: req.ip || '127.0.0.1',
+        usuarioId: req.userId
+      }
+    }).catch(() => {});
+
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
 };
 
 module.exports = {
   createConsulta,
   getPacienteHistorial,
   addColaborador,
-  createNotaClinica
+  createNotaClinica,
+  uploadAttachment,
+  listAttachments,
+  downloadAttachment,
+  deleteAttachment
 };
