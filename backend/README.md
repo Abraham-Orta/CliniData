@@ -32,6 +32,10 @@ Endpoints clave:
 - GET /api/patients?search=term
 - GET /api/patients/:id
 - POST /api/consultas
+- POST /api/consultas/:id/attachments
+- GET /api/consultas/:id/attachments
+- GET /api/consultas/:id/attachments/:attachmentId
+- DELETE /api/consultas/:id/attachments/:attachmentId
 
 Soporte y pruebas:
 - Ejecutar tests: npm test
@@ -41,4 +45,15 @@ Notas de seguridad:
 - No subir .env con secretos al repo.
 - ENCRYPTION_KEY y JWT_SECRET deben estar en CI y entorno de producción como secrets.
 
-Contact: equipo backend (ver README principal del repo)
+---
+
+## CI/CD y Docker
+
+- El backend se construye con Docker multi-stage (Node 18 slim, non-root user, HEALTHCHECK, imagen pequeña).
+- Usa `npm ci`, `npx prisma generate` y `npm run build` en el build.
+- Workflows de GitHub Actions:
+  - `.github/workflows/ci.yml`: Lint, test y build de imagen (con buildx y cache).
+  - `.github/workflows/publish.yml`: Publica imagen a GHCR en releases.
+- Variables sensibles (JWT_SECRET, ENCRYPTION_KEY) deben configurarse como secrets en CI y producción.
+- Despliegue recomendado: `docker-compose.production.yml`.
+- Imagen expone `/health` para chequeo de vida.

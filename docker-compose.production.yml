@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  backend:
+    image: ghcr.io/${DOCKER_REGISTRY_USER:-your-gh-username}/clini-data-backend:latest
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

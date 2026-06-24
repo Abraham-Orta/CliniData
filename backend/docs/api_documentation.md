@@ -7,7 +7,7 @@ Este documento describe en detalle el backend (Node/Express + Prisma + SQLite) p
 ## Resumen
 - URL base (local): http://localhost:3000
 - Swagger (OpenAPI): http://localhost:3000/docs (archivo: backend/openapi.yaml)
-- Objetivo: API MVP segura con login, RBAC/ReBAC, cifrado a nivel de campo (FLE), auditoría y endpoints clínicos mínimos.
+- Objetivo: API segura con login, RBAC/ReBAC, cifrado a nivel de campo (FLE), auditoría, adjuntos y endpoints clínicos mínimos.
 
 ---
 
@@ -54,13 +54,13 @@ Enviar en header: `Authorization: Bearer <token>`
 
 ### Registro (solo para scripts/ADMINS)
 - POST /api/auth/register
-- Body: { email, password, nombre, apellido, rol, clinicaId }
+- Body: { email, password, nombre, apellido, rol? }
 - Respuesta 201: user object (sin password)
 
 ---
 
 ## Flujo de Roles y Seguridad
-- Roles: ADMIN, MEDICO, USER.
+- Roles: ADMIN, MEDICO.
 - RBAC: middleware `authorize(['ROLE'])` protege rutas por rol.
 - ReBAC (relacional): `validatePatientAccess` verifica si el médico está autorizado para un paciente (medicoPrincipal, colaborador en consultas, o historial de consultas).
 - ADMIN: separado — por política no puede ver datos clínicos (se aplica restricción explícita en authorize salvo para operaciones administrativas como DELETE).
@@ -82,7 +82,8 @@ Importante: cambiar ENCRYPTION_KEY requiere re-seed o migración de datos legibl
 - Clinica: id, nombre, direccion, telefono
 - Usuario: id, email, nombre, apellido, password(hashed), rol, activo, clinicaId, creadoEn
 - Paciente: id, nombre (cifrado), apellido (cifrado), fechaNacimiento, genero, documentoIdentidad (cifrado), documentoIdentidadHash, telefono, email, medicoPrincipalId, clinicaId, creadoEn
-- Consulta: id, motivo (cifrado), sintomas (cifrado), observaciones (cifrado), pacienteId, medicoId, diagnosticos (rel), tratamientos (rel), creadoEn
+- Consulta: id, motivo (cifrado), sintomas (cifrado), observaciones (cifrado), pacienteId, medicoId, diagnosticos (rel), tratamientos (rel), notasClinicas (rel), colaboradores (rel), adjuntos (rel), creadoEn
+- Adjunto: id, nombre (cifrado), ruta, mimeType, size, consultaId, creadoEn
 - Diagnostico, Tratamiento, NotaClinica, Auditoria (accion, detalles, usuarioId, ipAddress, creadoEn)
 
 (Ver `prisma/schema.prisma` para todos los campos y relaciones exactas.)
@@ -124,21 +125,33 @@ Se recomienda usar Swagger UI (`/docs`) para ver ejemplos automáticos. Abajo ej
 
 6) Crear consulta (MEDICO)
 - POST /api/consultas
-- Body mínimo: { pacienteId, fecha, motivo, sintomas? }
+- Body mínimo: { pacienteId, motivo, sintomas?, presionArterial?, temperatura?, frecuenciaCardiaca?, peso?, observaciones?, diagnosticos?, tratamientos?, colaboradores? }
 - El middleware verifica acceso al pacienteId
-- Respuesta 201: consulta creada (id, pacienteId, medicoId, fecha)
+- Respuesta 201: consulta creada con relaciones incluidas
 
 7) Agregar colaborador a consulta (MEDICO)
 - POST /api/consultas/:id/colaboradores
-- Body: { colaboradorId }
+- Body: { medicoId }
 - Respuesta 200: estado/registro actualizado
 
 8) Notas clínicas (MEDICO)
 - POST /api/consultas/:id/notas
-- Body: { texto }
+- Body: { contenido }
 - Campo de nota cifrado en DB; res 201 con nota mínima
 
-9) Dashboard y Auditoría
+9) Adjuntos de consulta (MEDICO)
+- POST /api/consultas/:id/attachments
+  - Body: multipart/form-data con campo `file`
+  - Tipos permitidos: application/pdf, image/jpeg, image/png, image/gif
+  - Tamaño máximo: 5MB
+- GET /api/consultas/:id/attachments
+  - Lista metadatos de adjuntos
+- GET /api/consultas/:id/attachments/:attachmentId
+  - Descarga el archivo con su nombre original
+- DELETE /api/consultas/:id/attachments/:attachmentId
+  - Elimina el adjunto físico y el registro en BD
+
+10) Dashboard y Auditoría
 - GET /api/dashboard (ADMIN o MEDICO) — estadísticas agregadas
 - GET /api/auditorias (ADMIN) — listado de eventos de auditoría
 
@@ -170,7 +183,7 @@ Mensajes: el middleware devuelve JSON tipo `{ error: '...' }`.
 ---
 
 ## CI (GitHub Actions)
-- Archivo: .github/workflows/backend-ci.yml
+- Archivos: .github/workflows/ci.yml y .github/workflows/publish.yml
 - Pipeline estándar: usa Node 24, instala deps, `npx prisma generate`, `npx prisma db push`, `npm run seed` (opcional en CI con flag), `npm test`.
 - Requisitos CI: añadir secrets `JWT_SECRET` y `ENCRYPTION_KEY` en repo settings.
 
@@ -186,7 +199,7 @@ Mensajes: el middleware devuelve JSON tipo `{ error: '...' }`.
    - El backend devuelve campos descifrados — frontend no necesita manejar claves.
    - Para búsquedas por documento, enviar el valor tal cual a endpoint search; el backend usa blind index.
 4. Flujos recomendados
-   - Login → GET /api/users/me → GET /api/patients (lista) → GET /api/patients/:id → POST /api/consultas (crear) → POST /api/consultas/:id/notas
+    - Login → GET /api/users/me → GET /api/patients (lista) → GET /api/patients/:id → POST /api/consultas (crear) → POST /api/consultas/:id/notas → POST/GET/DELETE /api/consultas/:id/attachments
 
 ---
 

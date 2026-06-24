@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: CliniData Backend API
   version: 1.0.0
-  description: API mínima (MVP) para CliniData — autenticación, usuarios, pacientes, consultas y auditoría. Seguridad por JWT Bearer.
+  description: API de CliniData para autenticación, usuarios, pacientes, consultas, adjuntos y auditoría. Seguridad por JWT Bearer.
 servers:
   - url: http://localhost:3000
     description: Local development
@@ -12,6 +12,7 @@ tags:
   - name: users
   - name: patients
   - name: consultas
+  - name: attachments
   - name: dashboard
   - name: auditorias
 paths:
@@ -34,7 +35,7 @@ paths:
   /api/auth/register:
     post:
       tags: [auth]
-      summary: Registrar usuario (demo/admin puede crear médicos)
+      summary: Registrar usuario
       requestBody:
         required: true
         content:
@@ -276,7 +277,7 @@ paths:
             schema:
               type: object
               properties:
-                colaboradorId:
+                medicoId:
                   type: string
       responses:
         '200': { description: OK }
@@ -301,6 +302,102 @@ paths:
               $ref: '#/components/schemas/NotaCreate'
       responses:
         '201': { description: Nota creada }
+
+  /api/consultas/{id}/attachments:
+    post:
+      tags: [attachments]
+      summary: Subir archivo adjunto a una consulta
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Adjunto creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentCreateResponse'
+        '400': { description: Bad request }
+        '403': { description: Forbidden }
+    get:
+      tags: [attachments]
+      summary: Listar adjuntos de una consulta
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de adjuntos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Attachment'
+
+  /api/consultas/{id}/attachments/{attachmentId}:
+    get:
+      tags: [attachments]
+      summary: Descargar un adjunto
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: attachmentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Archivo descargado
+          content:
+            application/octet-stream: {}
+        '404': { description: Not found }
+    delete:
+      tags: [attachments]
+      summary: Eliminar un adjunto
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: attachmentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '204': { description: No Content }
+        '404': { description: Not found }
 
   /api/dashboard:
     get:
@@ -346,7 +443,7 @@ components:
           type: string
     AuthRegister:
       type: object
-      required: [email, password, nombre, apellido, rol, clinicaId]
+      required: [email, password, nombre, apellido]
       properties:
         email:
           type: string
@@ -359,9 +456,7 @@ components:
           type: string
         rol:
           type: string
-          enum: [ADMIN, MEDICO, USER]
-        clinicaId:
-          type: string
+          enum: [ADMIN, MEDICO]
     AuthResponse:
       type: object
       properties:
@@ -383,43 +478,119 @@ components:
       type: object
       properties:
         id: { type: string }
-        identificador: { type: string }
         nombre: { type: string }
         apellido: { type: string }
+        documentoIdentidad: { type: string }
+        documentoIdentidadHash: { type: string }
         fechaNacimiento:
           type: string
           format: date
-        sexo: { type: string }
-        telefono: { type: string }
+          nullable: true
+        genero:
+          type: string
+          enum: [MASCULINO, FEMENINO, OTRO]
+          nullable: true
+        telefono:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        contactoEmergencia:
+          type: string
+          nullable: true
+        telefonoEmergencia:
+          type: string
+          nullable: true
+        nombreTutor:
+          type: string
+          nullable: true
+        dniTutor:
+          type: string
+          nullable: true
+        clinicaId: { type: string }
+        medicoPrincipalId: { type: string }
+        creadoEn:
+          type: string
+          format: date-time
     PatientCreate:
       type: object
-      required: [identificador, nombre, apellido]
+      required: [nombre, apellido, documentoIdentidad]
       properties:
-        identificador: { type: string }
         nombre: { type: string }
         apellido: { type: string }
+        documentoIdentidad: { type: string }
         fechaNacimiento:
           type: string
           format: date
-        sexo: { type: string }
+        genero:
+          type: string
+          enum: [MASCULINO, FEMENINO, OTRO]
         telefono: { type: string }
+        email: { type: string }
+        contactoEmergencia: { type: string }
+        telefonoEmergencia: { type: string }
+        nombreTutor: { type: string }
+        dniTutor: { type: string }
     PatientUpdate:
       type: object
       properties:
         nombre: { type: string }
         apellido: { type: string }
+        documentoIdentidad: { type: string }
+        fechaNacimiento:
+          type: string
+          format: date
+          nullable: true
+        genero:
+          type: string
+          enum: [MASCULINO, FEMENINO, OTRO]
+          nullable: true
         telefono: { type: string }
+        email: { type: string }
+        contactoEmergencia: { type: string }
+        telefonoEmergencia: { type: string }
+        nombreTutor: { type: string }
+        dniTutor: { type: string }
     ConsultaCreate:
       type: object
-      required: [pacienteId, fecha, motivo]
+      required: [pacienteId, motivo]
       properties:
         pacienteId: { type: string }
-        fecha:
-          type: string
-          format: date-time
         motivo: { type: string }
         sintomas: { type: string }
+        presionArterial: { type: string }
+        temperatura:
+          type: number
+          format: float
+          nullable: true
+        frecuenciaCardiaca:
+          type: integer
+          nullable: true
+        peso:
+          type: number
+          format: float
+          nullable: true
         observaciones: { type: string }
+        diagnosticos:
+          type: array
+          items:
+            type: string
+        tratamientos:
+          type: array
+          items:
+            type: object
+            required: [medicamento, dosis, frecuencia, duracion]
+            properties:
+              medicamento: { type: string }
+              dosis: { type: string }
+              frecuencia: { type: string }
+              duracion: { type: string }
+              indicaciones: { type: string }
+        colaboradores:
+          type: array
+          items:
+            type: string
     Consulta:
       type: object
       properties:
@@ -431,12 +602,61 @@ components:
           format: date-time
         motivo: { type: string }
         sintomas: { type: string }
+        presionArterial: { type: string }
+        temperatura:
+          type: number
+          format: float
+          nullable: true
+        frecuenciaCardiaca:
+          type: integer
+          nullable: true
+        peso:
+          type: number
+          format: float
+          nullable: true
         observaciones: { type: string }
+        diagnosticos:
+          type: array
+          items:
+            type: object
+        tratamientos:
+          type: array
+          items:
+            type: object
+        notasClinicas:
+          type: array
+          items:
+            type: object
+        colaboradores:
+          type: array
+          items:
+            type: object
+        adjuntos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
     NotaCreate:
       type: object
-      required: [texto]
+      required: [contenido]
       properties:
-        texto: { type: string }
+        contenido: { type: string }
+    AttachmentCreateResponse:
+      type: object
+      properties:
+        id: { type: string }
+        creadoEn:
+          type: string
+          format: date-time
+    Attachment:
+      type: object
+      properties:
+        id: { type: string }
+        mimeType: { type: string }
+        size:
+          type: integer
+        creadoEn:
+          type: string
+          format: date-time
     Auditoria:
       type: object
       properties:
