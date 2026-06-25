@@ -150,3 +150,20 @@ model Adjunto {
   consulta   Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
   creadoEn   DateTime @default(now())
 }
+
+model Cita {
+  id         String   @id @default(uuid())
+  pacienteId String
+  paciente   Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId   String
+  medico     Usuario  @relation(fields: [medicoId], references: [id])
+  fechaHora  DateTime
+  duracion   Int?     // minutos
+  tipo       String?  // ej. 'consulta', 'control', 'teleconsulta'
+  estado     String   @default("pendiente") // 'pendiente', 'confirmada', 'cancelada', 'completada'
+  notas      String?
+  creadoEn   DateTime @default(now())
+
+  @@index([medicoId, fechaHora])
+  @@index([pacienteId, fechaHora])
+}

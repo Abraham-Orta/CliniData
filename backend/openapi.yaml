@@ -432,6 +432,132 @@ components:
       bearerFormat: JWT
 
   schemas:
+    CitaCreate:
+      type: object
+      required: [pacienteId, medicoId, fechaHora]
+      properties:
+        pacienteId: { type: string }
+        medicoId: { type: string }
+        fechaHora:
+          type: string
+          format: date-time
+        duracion: { type: integer }
+        tipo: { type: string }
+        notas: { type: string }
+    Cita:
+      type: object
+      properties:
+        id: { type: string }
+        pacienteId: { type: string }
+        medicoId: { type: string }
+        fechaHora:
+          type: string
+          format: date-time
+        duracion: { type: integer }
+        tipo: { type: string }
+        estado: { type: string, enum: [pendiente, confirmada, cancelada, completada] }
+        notas: { type: string }
+        creadoEn:
+          type: string
+          format: date-time
+
+paths:
+  /api/appointments:
+    get:
+      tags: [consultas]
+      summary: Listar citas (filtros: medicoId, pacienteId, since, until)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: medicoId
+          schema: { type: string }
+        - in: query
+          name: pacienteId
+          schema: { type: string }
+        - in: query
+          name: since
+          schema: { type: string, format: date-time }
+        - in: query
+          name: until
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Lista de citas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cita'
+    post:
+      tags: [consultas]
+      summary: Crear cita
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CitaCreate'
+      responses:
+        '201':
+          description: Cita creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cita'
+  /api/appointments/{id}:
+    get:
+      tags: [consultas]
+      summary: Obtener cita por id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cita
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cita'
+        '404': { description: Not found }
+    put:
+      tags: [consultas]
+      summary: Actualizar cita
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cita'
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [consultas]
+      summary: Eliminar cita
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: No Content }
     AuthRequest:
       type: object
       required: [email, password]
