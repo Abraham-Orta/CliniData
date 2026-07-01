@@ -35,6 +35,7 @@ model Usuario {
   auditorias           Auditoria[]
   colaboraciones       ColaboradorConsulta[]
   pacientesPrincipales Paciente[]             @relation("MedicoPrincipalPacientes")
+  citas                Cita[]
   creadoEn             DateTime               @default(now())
 }
 
@@ -57,6 +58,7 @@ model Paciente {
   medicoPrincipalId      String
   medicoPrincipal        Usuario    @relation("MedicoPrincipalPacientes", fields: [medicoPrincipalId], references: [id])
   consultas              Consulta[]
+  citas                  Cita[]
   creadoEn               DateTime   @default(now())
 }
 
