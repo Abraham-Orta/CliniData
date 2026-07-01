@@ -1,37 +1,92 @@
-import { simulateNetworkCall } from '../lib/apiClient';
-import { mockDb } from './mockDb';
+import { apiClient } from '../lib/apiClient';
 import { type GlobalAppointment } from "../types";
+import { apiAppointmentToUi, uiAppointmentToApi } from './adapters';
+
+type ApiAppointment = {
+  id: string;
+  pacienteId: string;
+  medicoId: string;
+  fechaHora: string;
+  duracion?: number | null;
+  tipo?: string | null;
+  estado?: 'confirmada' | 'pendiente' | 'cancelada' | 'completada' | null;
+  notas?: string | null;
+};
+
+function isoDayBounds(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return { since: start.toISOString(), until: end.toISOString() };
+}
+
+function doctorIdFromSession() {
+  try {
+    const raw = localStorage.getItem('auth_user');
+    if (!raw) return undefined;
+    const user = JSON.parse(raw);
+    return user?.id;
+  } catch {
+    return undefined;
+  }
+}
 
 export const appointmentService = {
-  // En el futuro:
-  // getUpcomingAppointments: (date) => apiClient.get('/appointments/upcoming', { params: { date } })
-  // getAppointmentsByDate: (date, doctorName) => apiClient.get('/appointments', { params: { date, doctorName } })
-  // createAppointment: (data) => apiClient.post('/appointments', data)
-  // updateAppointment: (id, data) => apiClient.patch(`/appointments/${id}`, data)
-
   getUpcomingAppointments: async (doctorId?: string, date?: string) => {
-    const proximas = mockDb.appointments.filter(a => a.status !== "cancelada").slice(0, 3);
-    return simulateNetworkCall(proximas, 1000, "Timeout al solicitar agenda del servidor.");
+    const targetDate = date ? new Date(date) : new Date();
+    const { since, until } = isoDayBounds(targetDate);
+    const medicoId = doctorId || doctorIdFromSession();
+    const query = new URLSearchParams({ since, until });
+    if (medicoId) query.set('medicoId', medicoId);
+
+    const appointments = await apiClient.get<ApiAppointment[]>(`/appointments?${query.toString()}`);
+    return appointments
+      .map((a) => apiAppointmentToUi(a))
+      .filter((a) => a.status !== 'cancelada')
+      .slice(0, 3);
   },
 
   getAppointmentsByDate: async (date: string, doctorName: string) => {
-    let filtered = mockDb.appointments.filter(a => a.date === date);
-    if (doctorName !== "Todos") {
-      filtered = filtered.filter(a => a.doctorId === "doc-1"); 
+    const targetDate = new Date(`${date}T00:00:00`);
+    const { since, until } = isoDayBounds(targetDate);
+    const params = new URLSearchParams({ since, until });
+
+    if (doctorName !== 'Todos') {
+      const medicoId = doctorIdFromSession();
+      if (medicoId) params.set('medicoId', medicoId);
     }
-    return simulateNetworkCall(filtered, 700, "Conexión perdida con el servidor de agenda.");
+
+    const appointments = await apiClient.get<ApiAppointment[]>(`/appointments?${params.toString()}`);
+    return appointments.map((a) => apiAppointmentToUi(a));
   },
 
   createAppointment: async (data: Omit<GlobalAppointment, "id">) => {
-    const newAppt = { ...data, id: `app-${Date.now()}` } as GlobalAppointment;
-    const savedAppt = await simulateNetworkCall(newAppt, 1000, "Fallo al registrar la cita.");
-    mockDb.appointments = [...mockDb.appointments, savedAppt];
-    return savedAppt;
+    const payload = uiAppointmentToApi(data);
+    const created = await apiClient.post<ApiAppointment>('/appointments', payload);
+    return apiAppointmentToUi(created);
   },
 
   updateAppointment: async (id: string, updates: Partial<GlobalAppointment>) => {
-    const updatedAppt = await simulateNetworkCall({ id, ...updates }, 600, "No se pudo actualizar el estado de la cita.");
-    mockDb.appointments = mockDb.appointments.map(a => a.id === id ? { ...a, ...updates, id } as GlobalAppointment : a);
-    return updatedAppt;
+    const payload: Record<string, any> = {};
+    if (updates.date || updates.time || updates.patientId || updates.doctorId) {
+      payload.fechaHora = uiAppointmentToApi({
+        id: id,
+        patientId: updates.patientId || '',
+        doctorId: updates.doctorId || doctorIdFromSession() || '',
+        date: updates.date || new Date().toISOString().split('T')[0],
+        time: updates.time || '09:00 AM',
+        patientName: '',
+        type: updates.type || 'rutina',
+        status: updates.status || 'pendiente',
+        notes: updates.notes
+      } as GlobalAppointment).fechaHora;
+    }
+    if (updates.type !== undefined) payload.tipo = updates.type;
+    if (updates.status !== undefined) payload.estado = updates.status;
+    if (updates.notes !== undefined) payload.notas = updates.notes;
+
+    const updated = await apiClient.put<ApiAppointment>(`/appointments/${id}`, payload);
+    return apiAppointmentToUi(updated);
   }
 };

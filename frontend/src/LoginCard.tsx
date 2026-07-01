@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Lock, Eye, EyeOff, ShieldCheck, ChevronRight } from "lucide-react";
 import { useAuth } from "./context/AuthContext";
+import { apiClient } from "./lib/apiClient";
 
 export function LoginCard() {
   const { login } = useAuth();
@@ -12,61 +13,49 @@ export function LoginCard() {
   const [error, setError] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-    
-    // Simula la validación restrictiva en el servidor
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      if (password.length < 6) {
-        setError("Credenciales inválidas. Verifica tu contraseña.");
-        return;
-      }
-      
-      if (Math.random() < 0.15) {
-        setError("Error de conexión con el directorio activo. Inténtalo de nuevo.");
-        return;
-      }
 
-      // Mock user object
+    try {
+      const response = await apiClient.post<any>('/auth/login', { email, password });
+      const apiUser = response?.user || {};
       const user = {
-        id: "dr-rachel-kim",
-        name: "Dr. Rachel Kim",
-        email: email,
-        role: "admin",
-        specialty: "Medicina Interna"
+        id: apiUser.id,
+        name: `${apiUser.nombre || ''} ${apiUser.apellido || ''}`.trim() || apiUser.email || 'Usuario',
+        email: apiUser.email,
+        role: (apiUser.rol || 'MEDICO').toLowerCase(),
+        specialty: 'Medicina Interna'
       };
 
-      // Create a mock token
-      const mockToken = "mock_jwt_token_" + Date.now();
-      
-      login(mockToken, user);
-    }, 1500); 
+      login(response.token, user);
+    } catch (err: any) {
+      setError(err?.message || 'Credenciales inválidas o servidor no disponible.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSsoClick = () => {
+  const handleSsoClick = async () => {
     setError(null);
     setIsSsoLoading(true);
-    setTimeout(() => {
-      setIsSsoLoading(false);
-      if (Math.random() < 0.15) {
-        setError("Servicio SSO no disponible en este momento.");
-        return;
-      }
-      
+    try {
+      const response = await apiClient.post<any>('/auth/login', { email, password });
+      const apiUser = response?.user || {};
       const user = {
-        id: "dr-rachel-kim",
-        name: "Dr. Rachel Kim",
-        email: "rachel.kim@clinidata.app",
-        role: "admin",
-        specialty: "Medicina Interna"
+        id: apiUser.id,
+        name: `${apiUser.nombre || ''} ${apiUser.apellido || ''}`.trim() || apiUser.email || 'Usuario',
+        email: apiUser.email,
+        role: (apiUser.rol || 'MEDICO').toLowerCase(),
+        specialty: 'Medicina Interna'
       };
-      
-      login("mock_sso_jwt_token_" + Date.now(), user);
-    }, 1800);
+      login(response.token, user);
+    } catch (err: any) {
+      setError(err?.message || "Servicio SSO no disponible en este momento.");
+    } finally {
+      setIsSsoLoading(false);
+    }
   };
 
   return (

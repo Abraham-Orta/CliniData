@@ -1,72 +1,117 @@
-import { simulateNetworkCall } from '../lib/apiClient';
-import { mockDb } from './mockDb';
+import { apiClient } from '../lib/apiClient';
 import { type ExtendedPatient } from "../types";
+import { apiPatientToUi } from './adapters';
+
+type ApiPatientListResponse = {
+  data: any[];
+  meta?: {
+    total?: number;
+    page?: number;
+    limit?: number;
+    totalPages?: number;
+  };
+};
+
+function splitName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const nombre = parts[0] || 'Paciente';
+  const apellido = parts.slice(1).join(' ') || 'SinApellido';
+  return { nombre, apellido };
+}
+
+function getBirthDateFromAge(age?: number): string | undefined {
+  if (!age || age <= 0) return undefined;
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - age);
+  return d.toISOString().split('T')[0];
+}
 
 export const patientService = {
-  // En el futuro:
-  // getPatients: (params) => apiClient.get('/patients', { params })
-  // createPatient: (data) => apiClient.post('/patients', data)
-
   getPatients: async (query: string, filterStatus: string, tab: string, page: number) => {
-    let filtered = mockDb.patients;
-    
-    if (tab === "casos-compartidos") {
-      filtered = filtered.filter(p => p.teamCount > 1);
-    } else {
-      filtered = filtered.filter(p => p.teamCount === 1);
-    }
+    const LIMIT = 6;
+    const search = encodeURIComponent(query || '');
+    const response = await apiClient.get<ApiPatientListResponse>(
+      `/patients?page=${page}&limit=${LIMIT}&search=${search}`
+    );
 
-    if (filterStatus !== "Todos") {
-      const statusMap: any = { "Estable": "estable", "Observación": "observacion", "Crítico": "critico" };
-      const s = statusMap[filterStatus];
-      if (s) filtered = filtered.filter(p => p.status === s);
+    let filtered = (response.data || []).map(apiPatientToUi);
+
+    // El backend actual no expone teamCount real; mantenemos compatibilidad de tabs con el valor derivado.
+    filtered = tab === 'casos-compartidos'
+      ? filtered.filter((p) => (p.teamCount || 1) > 1)
+      : filtered.filter((p) => (p.teamCount || 1) === 1);
+
+    if (filterStatus !== 'Todos') {
+      const statusMap: Record<string, 'estable' | 'observacion' | 'critico'> = {
+        Estable: 'estable',
+        Observación: 'observacion',
+        Crítico: 'critico'
+      };
+      const target = statusMap[filterStatus];
+      if (target) filtered = filtered.filter((p) => p.status === target);
     }
 
     if (query) {
       const lowerQuery = query.toLowerCase();
-      filtered = filtered.filter(p => 
-        p.name.toLowerCase().includes(lowerQuery) || 
-        p.condition.toLowerCase().includes(lowerQuery)
+      filtered = filtered.filter((p) =>
+        p.name.toLowerCase().includes(lowerQuery) || p.condition.toLowerCase().includes(lowerQuery)
       );
     }
 
-    const LIMIT = 6;
+    const total = response.meta?.total ?? filtered.length;
     const startIndex = (page - 1) * LIMIT;
     const endIndex = startIndex + LIMIT;
     const result = filtered.slice(startIndex, endIndex);
 
-    return simulateNetworkCall({ patients: result, hasMore: endIndex < filtered.length }, 800, "Conexión a base de datos de pacientes perdida.");
+    return {
+      patients: result,
+      hasMore: response.meta?.totalPages ? page < response.meta.totalPages : endIndex < total
+    };
   },
 
   createPatient: async (data: Omit<ExtendedPatient, "id">) => {
-    const newPatient = { ...data, id: `p-${Date.now()}` } as ExtendedPatient;
-    const savedPatient = await simulateNetworkCall(newPatient, 1000, "Fallo al registrar paciente.");
-    
-    // Almacenamos en el mock local
-    mockDb.patients = [savedPatient, ...mockDb.patients];
-    
-    return savedPatient;
+    const { nombre, apellido } = splitName(data.name);
+    const payload = {
+      nombre,
+      apellido,
+      documentoIdentidad: `TMP-${Date.now()}`,
+      fechaNacimiento: getBirthDateFromAge(data.age),
+      genero: null,
+      telefono: data.phone || null,
+      email: null
+    };
+
+    const created = await apiClient.post<any>('/patients', payload);
+    const mapped = apiPatientToUi(created);
+    return {
+      ...mapped,
+      condition: data.condition || mapped.condition,
+      status: data.status || mapped.status,
+      bloodType: data.bloodType || mapped.bloodType,
+      allergies: data.allergies || mapped.allergies
+    };
   },
 
   getPatientStats: async () => {
-    const total = mockDb.patients.length;
-    const estables = mockDb.patients.filter(p => p.status === "estable").length;
-    const criticos = mockDb.patients.filter(p => p.status === "critico").length;
-    const misPacientes = mockDb.patients.filter(p => p.teamCount === 1).length;
-    const casosCompartidos = mockDb.patients.filter(p => p.teamCount > 1).length;
+    const response = await apiClient.get<ApiPatientListResponse>('/patients?page=1&limit=200');
+    const patients = (response.data || []).map(apiPatientToUi);
+    const total = response.meta?.total ?? patients.length;
+    const estables = patients.filter((p) => p.status === 'estable').length;
+    const criticos = patients.filter((p) => p.status === 'critico').length;
+    const misPacientes = patients.filter((p) => (p.teamCount || 1) === 1).length;
+    const casosCompartidos = patients.filter((p) => (p.teamCount || 1) > 1).length;
 
-    return simulateNetworkCall({
+    return {
       total,
       estables,
       criticos,
       misPacientes,
       casosCompartidos
-    }, 500, "Error al cargar estadísticas de pacientes.");
+    };
   },
 
   getPatientById: async (id: string) => {
-    const patient = mockDb.patients.find(p => p.id === id);
-    if (!patient) throw new Error("Paciente no encontrado");
-    return simulateNetworkCall(patient, 500, "Paciente no encontrado");
+    const patient = await apiClient.get<any>(`/patients/${id}`);
+    return apiPatientToUi(patient);
   }
 };

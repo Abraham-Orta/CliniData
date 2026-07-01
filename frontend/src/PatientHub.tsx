@@ -58,6 +58,7 @@ export function PatientHub({ globalState, onPatientSelect, onNavigate, onLogout,
   const { isLoading, error: initialErrorObj, execute: executeLoad } = useApi(async () => {
     const res = await patientService.getPatients(debouncedSearch, filter, activeTab, 1);
     setLoadedPatients(res.patients);
+    setPatients(res.patients);
     setPage(1);
     setHasMore(res.hasMore);
     setIsSearching(false);
@@ -73,7 +74,11 @@ export function PatientHub({ globalState, onPatientSelect, onNavigate, onLogout,
   const { isLoading: isLoadingMore, error: moreErrorObj, execute: executeLoadMore } = useApi(async () => {
     const currentPage = page + 1;
     const res = await patientService.getPatients(debouncedSearch, filter, activeTab, currentPage);
-    setLoadedPatients(prev => [...prev, ...res.patients]);
+    setLoadedPatients(prev => {
+      const merged = [...prev, ...res.patients];
+      setPatients(merged);
+      return merged;
+    });
     setPage(currentPage);
     setHasMore(res.hasMore);
   });

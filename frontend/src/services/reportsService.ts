@@ -1,28 +1,39 @@
-import { simulateNetworkCall } from '../lib/apiClient';
-import { mockDb } from './mockDb';
+import { apiClient } from '../lib/apiClient';
+
+function monthLabel(date: Date) {
+  const m = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return m[date.getMonth()];
+}
 
 export const reportsService = {
   getGlobalStats: async () => {
-    const totalPatients = mockDb.patients.length;
-    const criticalPatients = mockDb.patients.filter(p => p.status === 'critico').length;
-    const completedAppointments = mockDb.appointments.filter(a => a.status === 'completada').length;
-    const totalAppointments = mockDb.appointments.length;
+    const [patientsResponse, appointments] = await Promise.all([
+      apiClient.get<any>('/patients?page=1&limit=500'),
+      apiClient.get<any[]>('/appointments')
+    ]);
+
+    const totalPatients = patientsResponse?.meta?.total ?? (patientsResponse?.data?.length || 0);
+    const criticalPatients = 0;
+    const completedAppointments = (appointments || []).filter((a) => a.estado === 'completada').length;
+    const totalAppointments = (appointments || []).length;
     const completionRate = totalAppointments > 0 ? Math.round((completedAppointments / totalAppointments) * 100) : 0;
 
-    return simulateNetworkCall({
+    return {
       totalPatients,
       criticalPatients,
       completedAppointments,
       completionRate
-    }, 1000, "Error loading global stats.");
+    };
   },
 
   getDemographics: async () => {
-    const statusCounts = mockDb.patients.reduce((acc, p) => {
-      const status = p.status || 'estable';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const response = await apiClient.get<any>('/patients?page=1&limit=500');
+    const patients = response?.data || [];
+    const statusCounts = {
+      estable: patients.length,
+      observacion: 0,
+      critico: 0
+    } as Record<string, number>;
 
     // Formatear para recharts
     const statusData = [
@@ -31,57 +42,62 @@ export const reportsService = {
       { name: 'Crítico', value: statusCounts['critico'] || 0, color: '#DC2626' }
     ];
 
-    return simulateNetworkCall({
+    return {
       statusDistribution: statusData
-    }, 1200, "Error loading demographics.");
+    };
   },
 
   getAdvancedMetrics: async () => {
-    // Bed Occupancy
-    const admittedPatients = mockDb.patients.filter(p => p.status === 'observacion' || p.status === 'critico').length;
-    const bedOccupancy = Math.round((admittedPatients / mockDb.config.totalBeds) * 100);
+    const appointments = await apiClient.get<any[]>('/appointments');
+    const total = (appointments || []).length;
+    const completed = (appointments || []).filter((a) => a.estado === 'completada').length;
 
-    // Readmission & Resolutivity Rate from Visits
-    const totalVisits = mockDb.visits.length;
-    const readmissions = mockDb.visits.filter(v => v.isReadmission).length;
-    const resolvedVisits = mockDb.visits.filter(v => v.isResolved).length;
-
-    const readmissionRate = totalVisits > 0 ? Number(((readmissions / totalVisits) * 100).toFixed(1)) : 0;
-    const resolutivityRate = totalVisits > 0 ? Number(((resolvedVisits / totalVisits) * 100).toFixed(1)) : 0;
-
-    return simulateNetworkCall({
-      bedOccupancy: bedOccupancy, // %
-      averageWaitTime: 24, // minutos (simulado por ahora al no haber timestamp de llegada y atencion precisos en base real)
-      readmissionRate: readmissionRate, // %
-      resolutivityRate: resolutivityRate, // %
-    }, 900, "Error loading advanced metrics.");
+    return {
+      bedOccupancy: 0,
+      averageWaitTime: 24,
+      readmissionRate: 0,
+      resolutivityRate: total > 0 ? Number(((completed / total) * 100).toFixed(1)) : 0,
+    };
   },
 
   getTopConditions: async () => {
-    // Injecting mocked varied data for a better preview experience
-    const mockVariedData = [
-      { name: "Hipertensión", count: 42 },
-      { name: "Diabetes Tipo 2", count: 28 },
-      { name: "Asma", count: 18 },
-      { name: "Fibrilación Auricular", count: 12 },
-      { name: "Postoperatorio Cardíaco", count: 5 }
-    ];
-
-    return simulateNetworkCall(mockVariedData, 1100, "Error loading top conditions.");
+    const dashboard = await apiClient.get<any>('/dashboard');
+    const top = dashboard?.data?.diagnosticosFrecuentes || [];
+    return top.map((d: any) => ({
+      name: d.descripcion || d.codigo || 'Sin dato',
+      count: d.cantidad || 0
+    }));
   },
 
   getAppointmentsTrends: async () => {
-    // Generar datos ficticios agregados con base a datos históricos.
-    // Simular los meses recientes para mostrar métricas analíticas complejas.
-    const trends = [
-      { name: 'Ene', consultas: 45, ingresos: 12 },
-      { name: 'Feb', consultas: 52, ingresos: 15 },
-      { name: 'Mar', consultas: 48, ingresos: 10 },
-      { name: 'Abr', consultas: 61, ingresos: 18 },
-      { name: 'May', consultas: 59, ingresos: 14 },
-      { name: 'Jun', consultas: 72, ingresos: 21 },
-    ];
+    const appointments = await apiClient.get<any[]>('/appointments');
+    const buckets = new Map<string, { consultas: number; ingresos: number }>();
 
-    return simulateNetworkCall(trends, 1500, "Error loading appointment trends.");
+    for (let i = 0; i < 6; i++) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      buckets.set(`${d.getFullYear()}-${d.getMonth()}`, { consultas: 0, ingresos: 0 });
+    }
+
+    (appointments || []).forEach((a) => {
+      const d = new Date(a.fechaHora);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!buckets.has(key)) return;
+      const current = buckets.get(key)!;
+      current.consultas += 1;
+      if (a.estado === 'completada') current.ingresos += 1;
+      buckets.set(key, current);
+    });
+
+    const trends = Array.from(buckets.entries())
+      .map(([key, value]) => {
+        const [y, m] = key.split('-').map(Number);
+        const date = new Date(y, m, 1);
+        return { name: monthLabel(date), consultas: value.consultas, ingresos: value.ingresos, sort: date.getTime() };
+      })
+      .sort((a, b) => a.sort - b.sort)
+      .map(({ sort, ...rest }) => rest);
+
+    return trends;
   }
 };
