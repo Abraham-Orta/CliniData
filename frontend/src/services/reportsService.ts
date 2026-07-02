@@ -27,23 +27,30 @@ export const reportsService = {
   },
 
   getDemographics: async () => {
+    // Intentar obtener datos reales del dashboard (solo disponible para MEDICO)
+    try {
+      const dashboard = await apiClient.get<any>('/dashboard');
+      if (dashboard?.data?.demografiaGenero) {
+        const genderData = dashboard.data.demografiaGenero.map((g: any) => ({
+          name: g.name === 'MASCULINO' ? 'Masculino' : g.name === 'FEMENINO' ? 'Femenino' : 'Otro',
+          value: g.value || 0,
+          color: g.name === 'MASCULINO' ? '#0B5394' : g.name === 'FEMENINO' ? '#BE185D' : '#7C3AED'
+        }));
+        return { statusDistribution: genderData };
+      }
+    } catch (e) {
+      console.warn('Fallback to patient count due to dashboard error:', e);
+    }
+
+    // Fallback: distribución genérica
     const response = await apiClient.get<any>('/patients?page=1&limit=500');
     const patients = response?.data || [];
-    const statusCounts = {
-      estable: patients.length,
-      observacion: 0,
-      critico: 0
-    } as Record<string, number>;
-
-    // Formatear para recharts
-    const statusData = [
-      { name: 'Estable', value: statusCounts['estable'] || 0, color: '#047857' },
-      { name: 'Observación', value: statusCounts['observacion'] || 0, color: '#F59E0B' },
-      { name: 'Crítico', value: statusCounts['critico'] || 0, color: '#DC2626' }
-    ];
-
     return {
-      statusDistribution: statusData
+      statusDistribution: [
+        { name: 'Total Pacientes', value: patients.length, color: '#047857' },
+        { name: 'Observación', value: 0, color: '#F59E0B' },
+        { name: 'Crítico', value: 0, color: '#DC2626' }
+      ]
     };
   },
 
@@ -53,6 +60,7 @@ export const reportsService = {
     const completed = (appointments || []).filter((a) => a.estado === 'completada').length;
 
     return {
+      // TODO: Métricas no disponibles desde el backend actual
       bedOccupancy: 0,
       averageWaitTime: 24,
       readmissionRate: 0,

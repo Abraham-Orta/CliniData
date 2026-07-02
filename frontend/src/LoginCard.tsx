@@ -26,7 +26,7 @@ export function LoginCard() {
         name: `${apiUser.nombre || ''} ${apiUser.apellido || ''}`.trim() || apiUser.email || 'Usuario',
         email: apiUser.email,
         role: (apiUser.rol || 'MEDICO').toLowerCase(),
-        specialty: 'Medicina Interna'
+        specialty: apiUser.rol === 'ADMIN' ? 'Administrador' : 'Médico'
       };
 
       login(response.token, user);
@@ -48,7 +48,7 @@ export function LoginCard() {
         name: `${apiUser.nombre || ''} ${apiUser.apellido || ''}`.trim() || apiUser.email || 'Usuario',
         email: apiUser.email,
         role: (apiUser.rol || 'MEDICO').toLowerCase(),
-        specialty: 'Medicina Interna'
+        specialty: apiUser.rol === 'ADMIN' ? 'Administrador' : 'Médico'
       };
       login(response.token, user);
     } catch (err: any) {

@@ -1,5 +1,6 @@
 import { useLocation } from "react-router-dom";
 import { LayoutGrid, Users, FileText, Calendar, TrendingUp, Settings, LogOut } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 interface SidebarProps {
   onNavigate: (view: string) => void;
@@ -11,13 +12,22 @@ interface SidebarProps {
 export function Sidebar({ onNavigate, onSettingsClick, onLogoutClick, onProfileClick }: SidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname.split("/")[1] || "dashboard";
+  const { user } = useAuth();
 
   const mainMenuItems = [
     { id: "dashboard", label: "Panel Principal", icon: LayoutGrid },
     { id: "patients", label: "Pacientes", icon: Users },
     { id: "reports", label: "Estadísticas", icon: TrendingUp },
-    { id: "agenda", label: "Agenda", icon: Calendar, badge: 3 },
+    { id: "agenda", label: "Agenda", icon: Calendar },
   ];
+
+  const initials = user?.nombre && user?.apellido 
+    ? `${user.nombre[0]}${user.apellido[0]}`.toUpperCase() 
+    : 'U';
+  const fullName = user?.nombre && user?.apellido 
+    ? `${user.nombre} ${user.apellido}` 
+    : 'Usuario';
+  const roleName = user?.rol === 'ADMIN' ? 'Administrador' : 'Médico';
 
   return (
     <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-full shrink-0">
@@ -36,11 +46,11 @@ export function Sidebar({ onNavigate, onSettingsClick, onLogoutClick, onProfileC
       <button onClick={onProfileClick} className="px-6 py-6 border-b border-slate-100 hover:bg-slate-50 transition-colors w-full text-left focus:outline-none">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0B5394] to-[#0E7490] flex items-center justify-center text-white font-bold shadow-sm shrink-0 transition-transform transform hover:scale-105">
-            DR
+            {initials}
           </div>
           <div className="overflow-hidden">
-            <h3 className="text-sm font-bold text-slate-900 truncate">Dr. Rachel Kim</h3>
-            <p className="text-xs font-medium text-slate-500 truncate">Medicina Interna</p>
+            <h3 className="text-sm font-bold text-slate-900 truncate">{fullName}</h3>
+            <p className="text-xs font-medium text-slate-500 truncate">{roleName}</p>
           </div>
         </div>
       </button>

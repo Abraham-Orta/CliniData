@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Shield, ChevronDown, CheckSquare, Square, Search, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
-
-export const COLLEAGUES = [
-  { id: "1", name: "Dra. Sarah Mitchell", specialty: "Cardiología" },
-  { id: "2", name: "Dr. James Okafor", specialty: "Neurología" },
-  { id: "3", name: "Dra. Priya Sharma", specialty: "Medicina Interna" },
-  { id: "4", name: "Dr. Carlos Reyes", specialty: "Oncología" },
-  { id: "5", name: "Dra. Leila Andersen", specialty: "Radiología" },
-  { id: "6", name: "Dr. Fernando Costa", specialty: "Traumatología" },
-  { id: "7", name: "Dra. Elena Rostova", specialty: "Endocrinología" },
-];
+import { userService } from "../services/userService";
 
 interface Props {
   onClose: () => void;
@@ -20,6 +11,8 @@ interface Props {
 type ModalView = "form" | "confirm-cancel" | "success";
 
 export function ShareModal({ onClose, patientName, onAssign }: Props) {
+  const [colleagues, setColleagues] = useState<Array<{ id: string; name: string; specialty: string }>>([]);
+  const [loadingColleagues, setLoadingColleagues] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [reasons, setReasons] = useState<Record<string, string>>({});
@@ -47,7 +40,23 @@ export function ShareModal({ onClose, patientName, onAssign }: Props) {
     }
   }, [view, onClose]);
 
-  const filteredColleagues = COLLEAGUES.filter((c) =>
+  // EFECTO 3: Cargar colegas desde la API al montar
+  useEffect(() => {
+    userService.getDoctors().then((docs) => {
+      const mapped = docs.map((d) => ({
+        id: d.id,
+        name: `${d.nombre || ''} ${d.apellido || ''}`.trim() || d.email,
+        specialty: 'Médico'
+      }));
+      setColleagues(mapped);
+      setLoadingColleagues(false);
+    }).catch(err => {
+      console.error(err);
+      setLoadingColleagues(false);
+    });
+  }, []);
+
+  const filteredColleagues = colleagues.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.specialty.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -76,10 +85,15 @@ export function ShareModal({ onClose, patientName, onAssign }: Props) {
     if (!isFormValid || isSubmitting) return;
     
     setIsSubmitting(true);
-    const assignments = selectedIds.map(id => ({
-      doctorId: id,
-      reason: reasons[id]
-    }));
+    const assignments = selectedIds.map(id => {
+      const doc = colleagues.find(c => c.id === id);
+      return {
+        doctorId: id,
+        name: doc?.name || '',
+        specialty: doc?.specialty || '',
+        reason: reasons[id]
+      };
+    });
 
     // Simulando transacción de red
     try {
@@ -197,7 +211,7 @@ export function ShareModal({ onClose, patientName, onAssign }: Props) {
               <div className="flex flex-col gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 transition-all">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Motivos de Inclusión</h4>
                 {selectedIds.map(id => {
-                  const doc = COLLEAGUES.find(c => c.id === id);
+                  const doc = colleagues.find(c => c.id === id);
                   return (
                     <div key={id} className="flex flex-col gap-1.5">
                       <label className="text-xs font-semibold text-slate-700">Para: {doc?.name} ({doc?.specialty})</label>

@@ -69,12 +69,12 @@ export const patientService = {
     };
   },
 
-  createPatient: async (data: Omit<ExtendedPatient, "id">) => {
+  createPatient: async (data: Omit<ExtendedPatient, "id"> & { documentId: string }) => {
     const { nombre, apellido } = splitName(data.name);
     const payload = {
       nombre,
       apellido,
-      documentoIdentidad: `TMP-${Date.now()}`,
+      documentoIdentidad: data.documentId,
       fechaNacimiento: getBirthDateFromAge(data.age),
       genero: null,
       telefono: data.phone || null,

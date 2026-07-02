@@ -28,6 +28,7 @@ export const dashboardService = {
 
     return {
       pacientesAtendidosHoy,
+      // TODO: El backend no expone conteo de casos críticos ni interconsultas
       casosCriticos: 0,
       interconsultas: 0,
       reportsCount: totalPacientes,

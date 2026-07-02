@@ -25,9 +25,11 @@ import { NotificationBell } from "./components/NotificationBell";
 import { useAuth } from "./context/AuthContext";
 import { useApi } from "./hooks/useApi";
 import { appointmentService } from "./services/appointmentService";
+import { waitlistService } from "./services/waitlistService";
+import { userService } from "./services/userService";
 
 export type VisitType = "rutina" | "control" | "urgencia" | "especialista";
-const DOCTORS = ["Todos", "Dr. Rachel Kim", "Dra. Sarah Mitchell", "Dr. Abraham Orta"];
+
 
 const HORARIOS = [
   "08:00 AM", "08:15 AM", "08:30 AM", "08:45 AM",
@@ -49,24 +51,7 @@ const TYPE_CONFIG: Record<string, any> = {
   urgencia: { label: "Urgencia (60m)", bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-100", duration: 60 },
   especialista: { label: "Especialista (45m)", bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-100", duration: 45 }
 };
-const FALLBACK_WAITLIST = [
-  {
-    id: "wl-1",
-    patientId: "s2",
-    patientName: "Clara Novak",
-    urgency: "alta",
-    requiredType: "urgencia",
-    addedAt: "07:30 AM",
-  },
-  {
-    id: "wl-2",
-    patientId: "s1",
-    patientName: "Yusuf Al-Farsi",
-    urgency: "media",
-    requiredType: "especialista",
-    addedAt: "Ayer",
-  },
-];
+
 const VISIT_TYPES_OPTIONS = [
   { value: "rutina", label: "Consulta de Rutina" },
   { value: "control", label: "Control Médico" },
@@ -83,9 +68,29 @@ export function Agenda({ globalState, onNavigate, onLogout, onSettings, onProfil
   const safeAppointments = globalState?.appointments || [];
   const safePatients = globalState?.patients || [];
   const safeEvents = globalState?.events || [];
-  const [localWaitlist, setLocalWaitlist] = useState<any[]>(FALLBACK_WAITLIST);
+  const [localWaitlist, setLocalWaitlist] = useState<any[]>([]);
   const waitlist = globalState?.waitlist || localWaitlist;
   const setWaitlist = globalState?.setWaitlist || setLocalWaitlist;
+
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+
+  const loadWaitlist = async () => {
+    setWaitlistLoading(true);
+    try {
+      const items = await waitlistService.getWaitlist();
+      setWaitlist(items);
+    } catch (e) {
+      console.error("Error loading waitlist:", e);
+    } finally {
+      setWaitlistLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadWaitlist();
+    userService.getDoctors().then(setDoctors).catch(err => console.error("Error loading doctors:", err));
+  }, []);
 
   // ESTADO DINÁMICO: Inicia en el día actual
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -302,61 +307,63 @@ export function Agenda({ globalState, onNavigate, onLogout, onSettings, onProfil
     executeAddAppointment(newAppointmentData);
   };
 
-  const handleCancelToWaitlist = () => {
+  const handleCancelToWaitlist = async () => {
     if (!appointmentToCancel) return;
-    globalState?.setAppointments(
-      safeAppointments.map((app: any) =>
-        app.id === appointmentToCancel.id
-          ? { ...app, status: "cancelada" }
-          : app,
-      ),
-    );
-    const newWlItem = {
-      id: `wl-${Date.now()}`,
-      patientId: appointmentToCancel.patientId,
-      patientName: appointmentToCancel.patientName,
-      urgency: "media",
-      requiredType: appointmentToCancel.type,
-      addedAt: "Reprogramación",
-    };
-    setWaitlist([newWlItem, ...waitlist]);
-    globalState?.setEvents([
-      {
-        id: `ev-${Date.now()}`,
-        type: "update",
-        doctorName: user?.name || "Dr. Rachel Kim",
-        action: "movió a lista de espera la cita de",
-        patientName: appointmentToCancel.patientName,
-        timeAgo: "Justo ahora",
-        read: true,
-      },
-      ...safeEvents,
-    ]);
-    setAppointmentToCancel(null);
+    try {
+      await appointmentService.updateAppointment(appointmentToCancel.id, { status: "cancelada" });
+      await waitlistService.addToWaitlist({
+        pacienteId: appointmentToCancel.patientId,
+        urgencia: "media",
+        tipoRequerido: appointmentToCancel.type,
+        notas: "Cancelación y reprogramación"
+      });
+      executeLoadAppointments(currentDateStr);
+      loadWaitlist();
+
+      globalState?.setEvents([
+        {
+          id: `ev-${Date.now()}`,
+          type: "update",
+          doctorName: user?.name || "Dr. Rachel Kim",
+          action: "movió a lista de espera la cita de",
+          patientName: appointmentToCancel.patientName,
+          timeAgo: "Justo ahora",
+          read: true,
+        },
+        ...safeEvents,
+      ]);
+    } catch (e) {
+      console.error("Error moving to waitlist:", e);
+      alert("Error al mover la cita a la lista de espera.");
+    } finally {
+      setAppointmentToCancel(null);
+    }
   };
 
-  const handleCancelDefinitive = () => {
+  const handleCancelDefinitive = async () => {
     if (!appointmentToCancel) return;
-    globalState?.setAppointments(
-      safeAppointments.map((app: any) =>
-        app.id === appointmentToCancel.id
-          ? { ...app, status: "cancelada" }
-          : app,
-      ),
-    );
-    globalState?.setEvents([
-      {
-        id: `ev-${Date.now()}`,
-        type: "alert",
-        doctorName: user?.name || "Dr. Rachel Kim",
-        action: "canceló definitivamente la cita de",
-        patientName: appointmentToCancel.patientName,
-        timeAgo: "Justo ahora",
-        read: true,
-      },
-      ...safeEvents,
-    ]);
-    setAppointmentToCancel(null);
+    try {
+      await appointmentService.updateAppointment(appointmentToCancel.id, { status: "cancelada" });
+      executeLoadAppointments(currentDateStr);
+
+      globalState?.setEvents([
+        {
+          id: `ev-${Date.now()}`,
+          type: "alert",
+          doctorName: user?.name || "Dr. Rachel Kim",
+          action: "canceló definitivamente la cita de",
+          patientName: appointmentToCancel.patientName,
+          timeAgo: "Justo ahora",
+          read: true,
+        },
+        ...safeEvents,
+      ]);
+    } catch (e) {
+      console.error("Error cancelling appointment:", e);
+      alert("Error al cancelar la cita.");
+    } finally {
+      setAppointmentToCancel(null);
+    }
   };
 
   const handleDragStart = (
@@ -397,10 +404,11 @@ export function Agenda({ globalState, onNavigate, onLogout, onSettings, onProfil
           patientName: wlPatient.patientName,
           type: wlPatient.requiredType,
           status: "confirmada",
-          doctorId: "doc-1"
+          doctorId: user?.id || ''
         });
+        await waitlistService.removeFromWaitlist(payload.id);
         executeLoadAppointments(currentDateStr);
-        setWaitlist(waitlist.filter((w: any) => w.id !== payload.id));
+        loadWaitlist();
         globalState?.setEvents([
           {
             id: `ev-${Date.now()}`,
@@ -433,27 +441,28 @@ export function Agenda({ globalState, onNavigate, onLogout, onSettings, onProfil
     }
   };
 
-  const handleDropOnWaitlist = (e: React.DragEvent) => {
+  const handleDropOnWaitlist = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragOverWaitlist(false);
     const dataStr = e.dataTransfer.getData("application/json");
     if (!dataStr) return;
     const { type, payload } = JSON.parse(dataStr);
     if (type === "appointment") {
-      const appt = safeAppointments.find((a: any) => a.id === payload.id);
+      const appt = displayAppointments.find((a: any) => a.id === payload.id);
       if (!appt) return;
-      const newWlItem = {
-        id: `wl-${Date.now()}`,
-        patientId: appt.patientId,
-        patientName: appt.patientName,
-        urgency: "media",
-        requiredType: appt.type,
-        addedAt: "Reprogramado",
-      };
-      setWaitlist([newWlItem, ...waitlist]);
-      globalState?.setAppointments(
-        safeAppointments.filter((a: any) => a.id !== payload.id),
-      );
+      try {
+        await appointmentService.updateAppointment(payload.id, { status: "cancelada" });
+        await waitlistService.addToWaitlist({
+          pacienteId: appt.patientId,
+          urgencia: "media",
+          tipoRequerido: appt.type,
+          notas: "Movido a lista de espera"
+        });
+        executeLoadAppointments(currentDateStr);
+        loadWaitlist();
+      } catch (err) {
+        console.error("Error moving to waitlist:", err);
+      }
     }
   };
 

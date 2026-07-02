@@ -8,6 +8,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/client"
 }
 
 model Clinica {
@@ -36,6 +37,7 @@ model Usuario {
   colaboraciones       ColaboradorConsulta[]
   pacientesPrincipales Paciente[]             @relation("MedicoPrincipalPacientes")
   citas                Cita[]
+  listaEspera          ListaEspera[]
   creadoEn             DateTime               @default(now())
 }
 
@@ -59,6 +61,7 @@ model Paciente {
   medicoPrincipal        Usuario    @relation("MedicoPrincipalPacientes", fields: [medicoPrincipalId], references: [id])
   consultas              Consulta[]
   citas                  Cita[]
+  listaEspera            ListaEspera[]
   creadoEn               DateTime   @default(now())
 }
 
@@ -168,4 +171,21 @@ model Cita {
 
   @@index([medicoId, fechaHora])
   @@index([pacienteId, fechaHora])
+}
+
+model ListaEspera {
+  id            String   @id @default(uuid())
+  pacienteId    String
+  paciente      Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medicoId      String
+  medico        Usuario  @relation(fields: [medicoId], references: [id])
+  urgencia      String   @default("media")
+  tipoRequerido String?
+  notas         String?
+  estado        String   @default("esperando") // 'esperando', 'atendido', 'cancelado'
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([medicoId, estado])
+  @@index([pacienteId])
 }

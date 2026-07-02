@@ -53,6 +53,7 @@ app.use('/api/users', require('./src/routes/users'));
 app.use('/api/patients', require('./src/routes/patients'));
 app.use('/api/consultas', require('./src/routes/consultas'));
 app.use('/api/appointments', require('./src/routes/appointments'));
+app.use('/api/waitlist', require('./src/routes/waitlist'));
 app.use('/api/dashboard', require('./src/routes/dashboard'));
 app.use('/api/auditorias', require('./src/routes/auditorias'));
 

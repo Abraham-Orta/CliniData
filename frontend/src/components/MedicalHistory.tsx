@@ -7,7 +7,7 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { type Patient } from "./PatientCard";
-import { ShareModal, COLLEAGUES } from "./ShareModal"; 
+import { ShareModal } from "./ShareModal"; 
 import { useAuth } from "../context/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { visitService } from "../services/visitService";
@@ -232,7 +232,7 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
   };
   
   // --- MANEJADORES DE EQUIPO MÉDICO ---
-  const handleAssignDoctors = (assignments: { doctorId: string; reason: string }[]) => { const newMembers = assignments.map(a => { const doc = COLLEAGUES.find(c => c.id === a.doctorId)!; return { id: doc.id, name: doc.name, specialty: doc.specialty, isPrimary: false, reason: a.reason }; }); setMedicalTeam(prev => { const filtered = prev.filter(p => !assignments.some(a => a.doctorId === p.id)); return [...filtered, ...newMembers]; }); };
+  const handleAssignDoctors = (assignments: any[]) => { const newMembers = assignments.map(a => { return { id: a.doctorId, name: a.name, specialty: a.specialty, isPrimary: false, reason: a.reason }; }); setMedicalTeam(prev => { const filtered = prev.filter(p => !assignments.some(a => a.doctorId === p.id)); return [...filtered, ...newMembers]; }); };
   const confirmRemoveDoctor = () => { if (doctorToRemove) { setMedicalTeam(prev => prev.filter(doc => doc.id !== doctorToRemove.id)); setDoctorToRemove(null); } };
   
   // --- MANEJADORES DE VISITAS ---

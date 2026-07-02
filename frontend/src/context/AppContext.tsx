@@ -10,7 +10,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [visits, setVisits] = useState<any[]>([]);
   const [waitlist, setWaitlist] = useState<any[]>([]);
   const [events, setEvents] = useState<SystemEvent[]>([]);
-  const [reportsCount, setReportsCount] = useState(24);
+  const [reportsCount, setReportsCount] = useState(0);
   const [activeAppointment, setActiveAppointment] = useState<GlobalAppointment | null>(null);
 
   // Carga inicial de notificaciones del sistema

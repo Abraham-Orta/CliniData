@@ -94,6 +94,8 @@ export function apiPatientToUi(patient: ApiPatient): Patient {
     name: fullName || 'Paciente sin nombre',
     age: calcAge(patient.fechaNacimiento),
     lastVisit: toUiDate(patient.creadoEn),
+    // TODO: El backend no expone estado clínico del paciente.
+    // Estos son valores por defecto hasta que se implemente en el backend.
     condition: 'Sin diagnóstico registrado',
     status: 'estable',
     initials: initials(fullName || patient.id),
