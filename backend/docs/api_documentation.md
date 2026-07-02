@@ -7,6 +7,7 @@ Este documento describe en detalle el backend (Node/Express + Prisma + SQLite) p
 ## Resumen
 - URL base (local): http://localhost:3000
 - Swagger (OpenAPI): http://localhost:3000/docs (archivo: backend/openapi.yaml)
+- Nuevos endpoints: /api/appointments (CRUD de Citas) disponibles — ver OpenAPI y sección Agenda/Citas más abajo
 - Objetivo: API segura con login, RBAC/ReBAC, cifrado a nivel de campo (FLE), auditoría, adjuntos y endpoints clínicos mínimos.
 
 ---

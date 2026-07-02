@@ -31,6 +31,31 @@ router.get('/me', authMiddleware, async (req, res, next) => {
   }
 });
 
+// 1.5. [ADMIN y MEDICO] Listar todos los médicos activos de la misma clínica (colegas)
+router.get('/doctors', authMiddleware, authorize(['ADMIN', 'MEDICO']), async (req, res, next) => {
+  try {
+    const doctors = await prisma.usuario.findMany({
+      where: {
+        rol: 'MEDICO',
+        activo: true,
+        clinicaId: req.user.clinicaId,
+        id: { not: req.userId }
+      },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        email: true
+      },
+      orderBy: { nombre: 'asc' }
+    });
+
+    res.json(doctors);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // 2. [ADMIN ONLY] Listar todos los usuarios médicos del sistema
 router.get('/', authMiddleware, authorize(['ADMIN']), async (req, res, next) => {
   try {

@@ -11,7 +11,7 @@ import { AppContext } from "./context/AppContext";
 import { useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
-import { simulateNetworkCall } from "./lib/apiClient";
+
 
 import { patientService } from "./services/patientService";
 import { useApi } from "./hooks/useApi";
@@ -37,7 +37,7 @@ function MedicalHistoryWrapper({ globalState, onBack }: any) {
 
 export default function App() {
   const globalState = useContext(AppContext);
-  const { logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -61,7 +61,6 @@ export default function App() {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
     try {
-      await simulateNetworkCall("logout", 1000, "Error en el servidor al intentar cerrar sesión.");
       setIsLogoutOpen(false); 
       logout();
     } catch (e) {
@@ -75,7 +74,7 @@ export default function App() {
     if (isSavingSettings) return;
     setIsSavingSettings(true);
     try {
-      await simulateNetworkCall("settings", 1500, "Error al guardar la configuración.");
+      await new Promise(resolve => setTimeout(resolve, 500));
       setIsSettingsOpen(false);
     } catch (e) {
       console.error(e);
@@ -166,10 +165,10 @@ export default function App() {
             <div className="p-6">
               <div className="flex flex-col items-center mb-6">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0B5394] to-[#0E7490] flex items-center justify-center text-white text-2xl font-bold shadow-lg mb-4">
-                  DR
+                  {user?.nombre && user?.apellido ? `${user.nombre[0]}${user.apellido[0]}`.toUpperCase() : 'U'}
                 </div>
-                <h2 className="text-xl font-bold text-slate-900">Dr. Rachel Kim</h2>
-                <p className="text-sm font-medium text-slate-500">Medicina Interna</p>
+                <h2 className="text-xl font-bold text-slate-900">{user?.nombre && user?.apellido ? `${user.nombre} ${user.apellido}` : 'Usuario'}</h2>
+                <p className="text-sm font-medium text-slate-500">{user?.rol === 'ADMIN' ? 'Administrador' : 'Médico'}</p>
                 <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Active
                 </div>
@@ -178,23 +177,23 @@ export default function App() {
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1 block">Número de Licencia</label>
-                  <p className="text-sm font-semibold text-slate-800">MED-8492-748V</p>
+                  <p className="text-sm font-semibold text-slate-800">No disponible</p>
                 </div>
                 <div className="h-px bg-slate-100"></div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1 block">Email de Contacto</label>
-                  <p className="text-sm font-semibold text-slate-800">rachel.kim@clinidata.app</p>
+                  <p className="text-sm font-semibold text-slate-800">{user?.email || 'No disponible'}</p>
                 </div>
                 <div className="h-px bg-slate-100"></div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1 block">Centro Asignado</label>
-                  <p className="text-sm font-semibold text-slate-800">Hospital General Metropolitano</p>
+                  <p className="text-sm font-semibold text-slate-800">CliniData</p>
                 </div>
                 <div className="h-px bg-slate-100"></div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1 block">Permisos de Sistema</label>
                   <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                    <Shield size={14} className="text-[#0B5394]" /> Administrador Médico Nivel 2
+                    <Shield size={14} className="text-[#0B5394]" /> {user?.rol === 'ADMIN' ? 'Administrador del Sistema' : 'Personal Médico Autorizado'}
                   </p>
                 </div>
               </div>

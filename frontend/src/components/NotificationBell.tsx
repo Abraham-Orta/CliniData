@@ -1,16 +1,22 @@
 import { useState } from "react";
 import { Bell, UserPlus, AlertTriangle, Activity, Info, CheckCircle2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export function NotificationBell({ globalState, onPatientSelect }: any) {
   const { events, setEvents, patients } = globalState;
   const [isOpen, setIsOpen] = useState(false);
+  const { user } = useAuth();
 
-  // NOTIFICACIONES: Solo alertas y asignaciones dirigidas directamente al Dr. Rachel Kim (usuario actual)
-  const userNotifications = events.filter((e: any) => e.targetUser === "Dr. Rachel Kim");
+  const doctorFullName = user?.nombre && user?.apellido 
+    ? `Dr. ${user.nombre} ${user.apellido}` 
+    : "Dr. Rachel Kim";
+
+  // NOTIFICACIONES: Solo alertas y asignaciones dirigidas directamente al médico actual
+  const userNotifications = events.filter((e: any) => e.targetUser === doctorFullName);
   const unreadCount = userNotifications.filter((e: any) => !e.read).length;
 
   const markAllAsRead = () => {
-    setEvents(events.map((e: any) => e.targetUser === "Dr. Rachel Kim" ? { ...e, read: true } : e));
+    setEvents(events.map((e: any) => e.targetUser === doctorFullName ? { ...e, read: true } : e));
   };
 
   const handleNotificationClick = (notif: any) => {

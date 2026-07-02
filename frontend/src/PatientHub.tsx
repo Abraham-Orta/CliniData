@@ -52,12 +52,14 @@ export function PatientHub({ globalState, onPatientSelect, onNavigate, onLogout,
   const [newLocation, setNewLocation] = useState("");
   const [newBloodType, setNewBloodType] = useState("O+");
   const [newAllergies, setNewAllergies] = useState("");
+  const [newDocumentId, setNewDocumentId] = useState("");
 
   const { data: patientStats, execute: loadStats } = useApi(patientService.getPatientStats);
 
   const { isLoading, error: initialErrorObj, execute: executeLoad } = useApi(async () => {
     const res = await patientService.getPatients(debouncedSearch, filter, activeTab, 1);
     setLoadedPatients(res.patients);
+    setPatients(res.patients);
     setPage(1);
     setHasMore(res.hasMore);
     setIsSearching(false);
@@ -73,7 +75,11 @@ export function PatientHub({ globalState, onPatientSelect, onNavigate, onLogout,
   const { isLoading: isLoadingMore, error: moreErrorObj, execute: executeLoadMore } = useApi(async () => {
     const currentPage = page + 1;
     const res = await patientService.getPatients(debouncedSearch, filter, activeTab, currentPage);
-    setLoadedPatients(prev => [...prev, ...res.patients]);
+    setLoadedPatients(prev => {
+      const merged = [...prev, ...res.patients];
+      setPatients(merged);
+      return merged;
+    });
     setPage(currentPage);
     setHasMore(res.hasMore);
   });
@@ -130,18 +136,19 @@ export function PatientHub({ globalState, onPatientSelect, onNavigate, onLogout,
     const colors = ["#0B5394", "#047857", "#7C3AED", "#B45309", "#BE185D"];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
     const newPatientData = {
-      name: newName, age: parseInt(newAge), lastVisit: todayFormatted, condition: newCondition, status: newStatus, initials, avatarColor: randomColor, phone: newPhone || "+58 (000) 000-0000", location: newLocation || "No especificada", bloodType: newBloodType, allergies: newAllergies || "Ninguna", teamCount: 1
+      name: newName, age: parseInt(newAge), lastVisit: todayFormatted, condition: newCondition, status: newStatus, initials, avatarColor: randomColor, phone: newPhone || "+58 (000) 000-0000", location: newLocation || "No especificada", bloodType: newBloodType, allergies: newAllergies || "Ninguna", teamCount: 1,
+      documentId: newDocumentId
     };
     
     executeSubmit(newPatientData);
   };
 
   const closeAddModal = () => {
-    setIsAddModalOpen(false); setAddView("form"); setNewName(""); setNewAge(""); setNewCondition(""); setNewStatus("estable"); setNewPhone(""); setNewLocation(""); setNewBloodType("O+"); setNewAllergies(""); setIsStatusOpen(false); setIsBloodOpen(false);
+    setIsAddModalOpen(false); setAddView("form"); setNewName(""); setNewAge(""); setNewDocumentId(""); setNewCondition(""); setNewStatus("estable"); setNewPhone(""); setNewLocation(""); setNewBloodType("O+"); setNewAllergies(""); setIsStatusOpen(false); setIsBloodOpen(false);
   };
 
   const handleAddCancelClick = () => {
-    if (newName || newAge || newCondition || newPhone || newLocation || newAllergies) setAddView("confirm-cancel");
+    if (newName || newAge || newDocumentId || newCondition || newPhone || newLocation || newAllergies) setAddView("confirm-cancel");
     else closeAddModal();
   };
 
@@ -277,6 +284,7 @@ export function PatientHub({ globalState, onPatientSelect, onNavigate, onLogout,
               </div>
               <form onSubmit={handleAddPatient} className="p-6 flex flex-col gap-4">
                 <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Nombre Completo</label><input type="text" required value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej. Ana García" className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF]" /></div>
+                <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Documento de Identidad (Cédula/DNI) *</label><input type="text" required minLength={5} maxLength={20} value={newDocumentId} onChange={e => setNewDocumentId(e.target.value)} placeholder="Ej. 12345678" className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF]" /></div>
                 <div className="flex gap-4">
                   <div className="w-1/3"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label><input type="number" required min="0" value={newAge} onChange={e => setNewAge(e.target.value)} placeholder="Años" className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF]" /></div>
                   <div className="w-2/3"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Estado Inicial</label>
