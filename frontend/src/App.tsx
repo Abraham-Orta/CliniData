@@ -165,10 +165,10 @@ export default function App() {
             <div className="p-6">
               <div className="flex flex-col items-center mb-6">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0B5394] to-[#0E7490] flex items-center justify-center text-white text-2xl font-bold shadow-lg mb-4">
-                  {user?.nombre && user?.apellido ? `${user.nombre[0]}${user.apellido[0]}`.toUpperCase() : 'U'}
+                  {user?.name ? user.name.slice(0, 2).toUpperCase() : 'U'}
                 </div>
-                <h2 className="text-xl font-bold text-slate-900">{user?.nombre && user?.apellido ? `${user.nombre} ${user.apellido}` : 'Usuario'}</h2>
-                <p className="text-sm font-medium text-slate-500">{user?.rol === 'ADMIN' ? 'Administrador' : 'Médico'}</p>
+                <h2 className="text-xl font-bold text-slate-900">{user?.name || 'Usuario'}</h2>
+                <p className="text-sm font-medium text-slate-500">{user?.role === 'admin' ? 'Administrador' : 'Médico'}</p>
                 <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Active
                 </div>
@@ -192,9 +192,9 @@ export default function App() {
                 <div className="h-px bg-slate-100"></div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 tracking-wider uppercase mb-1 block">Permisos de Sistema</label>
-                  <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                    <Shield size={14} className="text-[#0B5394]" /> {user?.rol === 'ADMIN' ? 'Administrador del Sistema' : 'Personal Médico Autorizado'}
-                  </p>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-semibold text-slate-600 w-full justify-center">
+                    <Shield size={14} className="text-[#0B5394]" /> {user?.role === 'admin' ? 'Administrador del Sistema' : 'Personal Médico Autorizado'}
+                  </div>
                 </div>
               </div>
             </div>

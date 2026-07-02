@@ -7,9 +7,7 @@ export function NotificationBell({ globalState, onPatientSelect }: any) {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuth();
 
-  const doctorFullName = user?.nombre && user?.apellido 
-    ? `Dr. ${user.nombre} ${user.apellido}` 
-    : "Dr. Rachel Kim";
+  const doctorFullName = user?.name ? `Dr. ${user.name}` : 'Dr. Usuario';
 
   // NOTIFICACIONES: Solo alertas y asignaciones dirigidas directamente al médico actual
   const userNotifications = events.filter((e: any) => e.targetUser === doctorFullName);

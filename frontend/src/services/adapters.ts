@@ -68,7 +68,8 @@ function toUiTime(dateLike: string): string {
   const minutes = String(d.getMinutes()).padStart(2, '0');
   const period = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12 || 12;
-  return `${hours}:${minutes} ${period}`;
+  const hoursStr = String(hours).padStart(2, '0');
+  return `${hoursStr}:${minutes} ${period}`;
 }
 
 function initials(fullName: string): string {
@@ -109,15 +110,19 @@ export function apiPatientToUi(patient: ApiPatient): Patient {
 }
 
 export function apiAppointmentToUi(
-  appointment: ApiAppointment,
+  appointment: ApiAppointment & { paciente?: { nombre?: string, apellido?: string } },
   patientNameById: Record<string, string> = {}
 ): Appointment {
+  const patientName = appointment.paciente 
+    ? `${appointment.paciente.nombre || ''} ${appointment.paciente.apellido || ''}`.trim()
+    : patientNameById[appointment.pacienteId] || 'Paciente';
+
   return {
     id: appointment.id,
     patientId: appointment.pacienteId,
     date: toIsoDate(appointment.fechaHora),
     time: toUiTime(appointment.fechaHora),
-    patientName: patientNameById[appointment.pacienteId] || 'Paciente',
+    patientName: patientName || 'Paciente',
     type: appointment.tipo || 'rutina',
     status: appointment.estado || 'pendiente',
     notes: appointment.notas || undefined,
