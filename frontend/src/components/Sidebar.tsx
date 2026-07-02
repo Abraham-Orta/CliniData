@@ -21,13 +21,9 @@ export function Sidebar({ onNavigate, onSettingsClick, onLogoutClick, onProfileC
     { id: "agenda", label: "Agenda", icon: Calendar },
   ];
 
-  const initials = user?.nombre && user?.apellido 
-    ? `${user.nombre[0]}${user.apellido[0]}`.toUpperCase() 
-    : 'U';
-  const fullName = user?.nombre && user?.apellido 
-    ? `${user.nombre} ${user.apellido}` 
-    : 'Usuario';
-  const roleName = user?.rol === 'ADMIN' ? 'Administrador' : 'Médico';
+  const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'U';
+  const fullName = user?.name || 'Usuario';
+  const roleName = user?.role === 'admin' ? 'Administrador' : 'Médico';
 
   return (
     <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-full shrink-0">

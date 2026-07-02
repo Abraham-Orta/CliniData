@@ -5,24 +5,59 @@ require('dotenv').config();
 
 const { generateBlindIndex } = require('../src/utils/securityHelper');
 
-// Datos de ejemplo para nombres, apellidos, etc.
-const nombres = ['Juan', 'María', 'Carlos', 'Elena', 'Roberto', 'Ana', 'Diego', 'Sofía', 'Luis', 'Carmen'];
-const apellidos = ['Pérez', 'García', 'Martínez', 'López', 'Hernández', 'González', 'Sánchez', 'Jiménez', 'Rodríguez', 'Morales'];
+const nombres = ['Juan', 'María', 'Carlos', 'Elena', 'Roberto', 'Ana', 'Diego', 'Sofía', 'Luis', 'Carmen', 'Javier', 'Laura', 'Pedro', 'Marta', 'Andrés', 'Isabel', 'Miguel', 'Lucía', 'Fernando', 'Paula'];
+const apellidos = ['Pérez', 'García', 'Martínez', 'López', 'Hernández', 'González', 'Sánchez', 'Jiménez', 'Rodríguez', 'Morales', 'Gómez', 'Fernández', 'Díaz', 'Álvarez', 'Romero', 'Ruiz', 'Navarro', 'Torres', 'Domínguez', 'Vázquez'];
+
 const motivosConsulta = [
-  'Control de presión arterial',
-  'Revisión general',
-  'Dolor de cabeza',
-  'Síntomas de gripe',
-  'Control de diabetes',
-  'Dolor en el pecho',
-  'Fatiga extrema',
-  'Problemas digestivos',
-  'Infección respiratoria',
-  'Seguimiento post-operatorio'
+  'Control anual de salud',
+  'Seguimiento de hipertensión arterial',
+  'Control glucémico en diabetes',
+  'Cefalea tensional recurrente',
+  'Dolor lumbar crónico',
+  'Infección de vías respiratorias',
+  'Evaluación cardiovascular',
+  'Dermatitis atópica severa',
+  'Trastorno del sueño',
+  'Síndrome metabólico',
+  'Revisión post-operatoria',
+  'Cuadro febril agudo',
+  'Dolor articular - posible artritis',
+  'Chequeo general preventivo',
+  'Asma bronquial en exacerbación'
 ];
+
+const observaciones = [
+  'Paciente refiere mejoría clínica. Se ajusta dosis de medicación. Próximo control en 3 meses.',
+  'Cuadro estable. Se indican laboratorios de rutina y ecografía de control.',
+  'Paciente con mala adherencia al tratamiento. Se refuerzan pautas dietéticas y de ejercicio.',
+  'Presenta leve dolor residual. Evolución favorable. Alta médica en 2 semanas.',
+  'Se detecta presión arterial elevada. Se inicia tratamiento farmacológico.',
+  'Interconsulta solicitada con especialista. Continuar tratamiento actual hasta evaluación.',
+  'Resultados de laboratorio dentro de límites normales. Excelente estado de salud.',
+  'Paciente manifiesta efectos secundarios leves al medicamento. Se cambia prescripción.'
+];
+
 const medicamentos = [
-  'Enalapril', 'Metformina', 'Amoxicilina', 'Ibuprofeno', 'Paracetamol',
-  'Lisinopril', 'Atorvastatina', 'Losartán', 'Amlodipina', 'Aspirina'
+  'Enalapril 20mg', 'Metformina 850mg', 'Amoxicilina 500mg', 'Ibuprofeno 400mg', 'Paracetamol 1g',
+  'Lisinopril 10mg', 'Atorvastatina 40mg', 'Losartán 50mg', 'Amlodipina 5mg', 'Aspirina 100mg',
+  'Omeprazol 20mg', 'Salbutamol inhalador', 'Levotiroxina 100mcg', 'Clonazepam 2mg', 'Sertralina 50mg'
+];
+
+const diagnosticosData = [
+  { codigo: 'I10', descripcion: 'Hipertensión esencial (primaria)' },
+  { codigo: 'I11', descripcion: 'Enfermedad cardiaca hipertensiva' },
+  { codigo: 'E11', descripcion: 'Diabetes mellitus no insulinodependiente' },
+  { codigo: 'E10', descripcion: 'Diabetes mellitus tipo 1' },
+  { codigo: 'J06', descripcion: 'Infecciones agudas de las vías respiratorias superiores' },
+  { codigo: 'J18', descripcion: 'Neumonía sin especificar' },
+  { codigo: 'K21', descripcion: 'Reflujo gastroesofágico' },
+  { codigo: 'M79.3', descripcion: 'Paniculitis no especificada' },
+  { codigo: 'F41', descripcion: 'Trastornos de ansiedad' },
+  { codigo: 'M25.5', descripcion: 'Dolor articular' },
+  { codigo: 'J45', descripcion: 'Asma' },
+  { codigo: 'E66', descripcion: 'Obesidad' },
+  { codigo: 'G44', descripcion: 'Otros síndromes de cefalea' },
+  { codigo: 'M54.5', descripcion: 'Lumbago no especificado' }
 ];
 
 function getRandomElement(arr) {
@@ -37,242 +72,234 @@ function randomDate(start, end) {
   return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
 }
 
-async function main() {
-  console.log('🌱 Iniciando siembra de base de datos con datos de ejemplo...\n');
+async function cleanDatabase() {
+  console.log('🧹 Limpiando la base de datos...');
+  await prisma.listaEspera.deleteMany();
+  await prisma.cita.deleteMany();
+  await prisma.adjunto.deleteMany();
+  await prisma.auditoria.deleteMany();
+  await prisma.colaboradorConsulta.deleteMany();
+  await prisma.notaClinica.deleteMany();
+  await prisma.tratamiento.deleteMany();
+  await prisma.consultaDiagnostico.deleteMany();
+  await prisma.consulta.deleteMany();
+  await prisma.paciente.deleteMany();
+  await prisma.diagnostico.deleteMany();
+  await prisma.usuario.deleteMany();
+  await prisma.clinica.deleteMany();
+  console.log('✓ Base de datos limpia.\n');
+}
 
-  // 1. Crear 3 clínicas
-  console.log('📋 Creando clínicas...');
+async function main() {
+  console.log('🌱 Iniciando siembra de datos realistas para demostración...\n');
+  await cleanDatabase();
+
   const clinicasData = [
-    { nombre: 'Clínica de Salud Familiar Local', direccion: 'Av. Principal 123, Centro', telefono: '555-0199' },
-    { nombre: 'Hospital Regional del Este', direccion: 'Calle 15 #456, Zona Este', telefono: '555-0200' },
-    { nombre: 'Centro Médico Privado', direccion: 'Av. Libertad 789, Zona Comercial', telefono: '555-0300' }
+    { nombre: 'Clínica de Especialidades Las Condes', direccion: 'Av. Las Condes 1234', telefono: '555-1010' },
+    { nombre: 'Centro Médico Integral Providencia', direccion: 'Av. Providencia 456', telefono: '555-2020' }
   ];
 
   const clinicas = [];
   for (const clinicaData of clinicasData) {
-    let clinica = await prisma.clinica.findFirst({ where: { nombre: clinicaData.nombre } });
-    if (!clinica) {
-      clinica = await prisma.clinica.create({ data: clinicaData });
-      console.log(`  ✓ ${clinica.nombre}`);
-    }
+    const clinica = await prisma.clinica.create({ data: clinicaData });
     clinicas.push(clinica);
   }
+  console.log(`📋 Creadas ${clinicas.length} clínicas.`);
 
-  // 2. Crear usuarios (admins y médicos) para cada clínica
-  console.log('\n👥 Creando usuarios...');
-  const usuarios = {};
-  let userCount = 0;
+  console.log('👥 Creando usuarios médicos y administradores...');
+  const hashed = await bcrypt.hash('password123', 10);
+  const medicos = [];
 
-  for (const clinica of clinicas) {
-    // Crear 1 admin por clínica
-    const adminEmail = `admin${clinicas.indexOf(clinica)}@example.com`;
-    let admin = await prisma.usuario.findUnique({ where: { email: adminEmail } }).catch(() => null);
-    if (!admin) {
-      const hashed = await bcrypt.hash('password123', 10);
-      admin = await prisma.usuario.create({
+  // Usuario Demo principal
+  const clinicaPrincipal = clinicas[0];
+  const demoMedico = await prisma.usuario.create({
+    data: {
+      email: 'medico@clinidata.com',
+      password: hashed,
+      nombre: 'Carlos',
+      apellido: 'Mendoza',
+      rol: 'MEDICO',
+      activo: true,
+      clinicaId: clinicaPrincipal.id
+    }
+  });
+  medicos.push(demoMedico);
+  console.log('  ✓ Creado Usuario Demo: medico@clinidata.com (Pass: password123)');
+
+  const demoAdmin = await prisma.usuario.create({
+    data: {
+      email: 'admin@clinidata.com',
+      password: hashed,
+      nombre: 'Administrador',
+      apellido: 'Clínica',
+      rol: 'ADMIN',
+      activo: true,
+      clinicaId: clinicaPrincipal.id
+    }
+  });
+  console.log('  ✓ Creado Admin Demo: admin@clinidata.com (Pass: password123)');
+
+  // Más médicos para llenar el directorio (colegas)
+  for (let i = 0; i < 8; i++) {
+    const n = getRandomElement(nombres);
+    const a = getRandomElement(apellidos);
+    const m = await prisma.usuario.create({
+      data: {
+        email: `dr.${n.toLowerCase()}.${a.toLowerCase()}${i}@clinidata.com`,
+        password: hashed,
+        nombre: `Dr. ${n}`,
+        apellido: a,
+        rol: 'MEDICO',
+        activo: true,
+        clinicaId: clinicaPrincipal.id
+      }
+    });
+    medicos.push(m);
+  }
+
+  console.log('📊 Creando catálogo de diagnósticos (CIE-10)...');
+  const dbDiagnosticos = [];
+  for (const diag of diagnosticosData) {
+    const d = await prisma.diagnostico.create({ data: diag });
+    dbDiagnosticos.push(d);
+  }
+
+  console.log('🏥 Creando pacientes (volumen alto)...');
+  const pacientes = [];
+  // Crear unos 80 pacientes para el médico demo y otros médicos
+  for (let i = 0; i < 80; i++) {
+    const nombre = getRandomElement(nombres);
+    const apellido = getRandomElement(apellidos);
+    const dni = generateDNI();
+    const dniHash = generateBlindIndex(dni);
+    const medicoPrincipal = i < 40 ? demoMedico : getRandomElement(medicos); // 40 pacientes para el demoMedico
+
+    const p = await prisma.paciente.create({
+      data: {
+        nombre,
+        apellido,
+        fechaNacimiento: randomDate(new Date(1940, 0, 1), new Date(2015, 0, 1)),
+        genero: ['MASCULINO', 'FEMENINO'][Math.floor(Math.random() * 2)],
+        documentoIdentidad: dni,
+        documentoIdentidadHash: dniHash,
+        telefono: `+56 9 ${Math.floor(10000000 + Math.random() * 90000000)}`,
+        email: `${nombre.toLowerCase()}.${apellido.toLowerCase()}${Math.floor(Math.random()*100)}@gmail.com`,
+        clinicaId: clinicaPrincipal.id,
+        medicoPrincipalId: medicoPrincipal.id
+      }
+    });
+    pacientes.push(p);
+  }
+  console.log(`  ✓ Creados ${pacientes.length} pacientes.`);
+
+  console.log('📝 Creando historial de consultas y tratamientos...');
+  let totalConsultas = 0;
+  for (const paciente of pacientes) {
+    const numConsultas = 1 + Math.floor(Math.random() * 5); // 1 a 5 consultas por paciente
+    for (let c = 0; c < numConsultas; c++) {
+      const diag1 = getRandomElement(dbDiagnosticos);
+      const diag2 = Math.random() > 0.7 ? getRandomElement(dbDiagnosticos) : null;
+      
+      const consulta = await prisma.consulta.create({
         data: {
-          email: adminEmail,
-          nombre: 'Admin',
-          apellido: clinica.nombre,
-          password: hashed,
-          rol: 'ADMIN',
-          activo: true,
-          clinicaId: clinica.id
+          fecha: randomDate(new Date(2023, 0, 1), new Date()),
+          motivo: getRandomElement(motivosConsulta),
+          sintomas: 'Paciente refiere malestar general, astenia y adinamia. Sin otros síntomas de alarma.',
+          presionArterial: `${110 + Math.floor(Math.random() * 40)}/${70 + Math.floor(Math.random() * 25)}`,
+          temperatura: 36 + (Math.random() * 2),
+          frecuenciaCardiaca: 60 + Math.floor(Math.random() * 40),
+          peso: 50 + Math.floor(Math.random() * 60),
+          observaciones: getRandomElement(observaciones),
+          pacienteId: paciente.id,
+          medicoId: paciente.medicoPrincipalId,
+          tratamientos: {
+            create: [
+              {
+                medicamento: getRandomElement(medicamentos),
+                dosis: '1 comprimido',
+                frecuencia: 'Cada 12 horas',
+                duracion: '14 días',
+                indicaciones: 'Tomar con abundante agua después de las comidas.'
+              }
+            ]
+          }
         }
       });
-      userCount++;
-      console.log(`  ✓ Admin: ${admin.email}`);
-    }
-    usuarios[adminEmail] = admin;
 
-    // Crear 5-7 médicos por clínica
-    const medCount = 5 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < medCount; i++) {
-      const nombre = getRandomElement(nombres);
-      const apellido = getRandomElement(apellidos);
-      const email = `medico.${nombre.toLowerCase()}.${apellido.toLowerCase()}${i}@example.com`;
-
-      let medico = await prisma.usuario.findUnique({ where: { email } }).catch(() => null);
-      if (!medico) {
-        const hashed = await bcrypt.hash('password123', 10);
-        medico = await prisma.usuario.create({
-          data: {
-            email,
-            nombre,
-            apellido,
-            password: hashed,
-            rol: 'MEDICO',
-            activo: Math.random() > 0.1,
-            clinicaId: clinica.id
-          }
+      // Relación con diagnósticos
+      await prisma.consultaDiagnostico.create({
+        data: { consultaId: consulta.id, diagnosticoId: diag1.id }
+      });
+      if (diag2 && diag1.id !== diag2.id) {
+        await prisma.consultaDiagnostico.create({
+          data: { consultaId: consulta.id, diagnosticoId: diag2.id }
         });
-        userCount++;
-        console.log(`  ✓ Médico: ${medico.email}`);
-      }
-      usuarios[email] = medico;
-    }
-  }
-
-  // 3. Crear diagnósticos ampliados (CIE-10)
-  console.log('\n📊 Creando diagnósticos...');
-  const diagnosticosData = [
-    { codigo: 'I10', descripcion: 'Hipertensión esencial (primaria)' },
-    { codigo: 'I11', descripcion: 'Enfermedad cardiaca hipertensiva' },
-    { codigo: 'E11', descripcion: 'Diabetes mellitus no insulinodependiente' },
-    { codigo: 'E10', descripcion: 'Diabetes mellitus tipo 1' },
-    { codigo: 'J06', descripcion: 'Infecciones agudas de las vías respiratorias superiores' },
-    { codigo: 'J18', descripcion: 'Neumonía sin especificar' },
-    { codigo: 'K21', descripcion: 'Reflujo gastroesofágico' },
-    { codigo: 'M79.3', descripcion: 'Paniculitis no especificada' },
-    { codigo: 'F41', descripcion: 'Trastornos de ansiedad' },
-    { codigo: 'M25.5', descripcion: 'Dolor articular' }
-  ];
-
-  const diagnosticos = {};
-  for (const diag of diagnosticosData) {
-    let existing = await prisma.diagnostico.findUnique({ where: { codigo: diag.codigo } }).catch(() => null);
-    if (!existing) {
-      existing = await prisma.diagnostico.create({ data: diag });
-      console.log(`  ✓ ${diag.codigo} - ${diag.descripcion}`);
-    }
-    diagnosticos[diag.codigo] = existing;
-  }
-
-  // 4. Crear pacientes abundantes
-  console.log('\n🏥 Creando pacientes...');
-  let patientCount = 0;
-  const pacientesPorClinica = 15;
-
-  for (const clinica of clinicas) {
-    const medicosClinica = Object.values(usuarios).filter(u => u.clinicaId === clinica.id && u.rol === 'MEDICO');
-
-    for (let i = 0; i < pacientesPorClinica; i++) {
-      const nombre = getRandomElement(nombres);
-      const apellido = getRandomElement(apellidos);
-      const dni = generateDNI();
-      const dniHash = generateBlindIndex(dni);
-
-      let paciente = await prisma.paciente.findUnique({ where: { documentoIdentidadHash: dniHash } }).catch(() => null);
-      if (!paciente) {
-        const medicoPrincipal = getRandomElement(medicosClinica);
-        paciente = await prisma.paciente.create({
-          data: {
-            nombre,
-            apellido,
-            fechaNacimiento: randomDate(new Date(1950, 0, 1), new Date(2010, 0, 1)),
-            genero: ['MASCULINO', 'FEMENINO', 'OTRO'][Math.floor(Math.random() * 3)],
-            documentoIdentidad: dni,
-            documentoIdentidadHash: dniHash,
-            telefono: `555-${Math.floor(1000 + Math.random() * 9000)}`,
-            email: `${nombre.toLowerCase()}.${apellido.toLowerCase()}@example.com`,
-            clinicaId: clinica.id,
-            medicoPrincipalId: medicoPrincipal.id
-          }
-        });
-        patientCount++;
-        if (i < 2) console.log(`  ✓ ${nombre} ${apellido} en ${clinica.nombre}`);
       }
 
-      // 5. Crear múltiples consultas por paciente (3-8 consultas)
-      const consultasCount = 3 + Math.floor(Math.random() * 6);
-      for (let c = 0; c < consultasCount; c++) {
-        const medico = getRandomElement(medicosClinica);
-        const motivo = getRandomElement(motivosConsulta);
-        const diagnosticoCodigos = Object.keys(diagnosticos).slice(0, Math.floor(Math.random() * 3) + 1);
-
-        const consulta = await prisma.consulta.create({
-          data: {
-            fecha: randomDate(new Date(2023, 0, 1), new Date()),
-            motivo,
-            sintomas: ['Síntomas leves', 'Síntomas moderados', 'Sin síntomas aparentes'][Math.floor(Math.random() * 3)],
-            presionArterial: `${120 + Math.floor(Math.random() * 40)}/${80 + Math.floor(Math.random() * 20)}`,
-            temperatura: 36 + Math.random() * 1.5,
-            frecuenciaCardiaca: 60 + Math.floor(Math.random() * 40),
-            peso: 50 + Math.random() * 50,
-            observaciones: 'Paciente en buen estado general. Seguimiento recomendado.',
-            pacienteId: paciente.id,
-            medicoId: medico.id,
-            diagnosticos: {
-              create: diagnosticoCodigos.map(codigo => ({
-                diagnosticoId: diagnosticos[codigo].id
-              }))
-            },
-            tratamientos: {
-              create: Array.from({ length: 1 + Math.floor(Math.random() * 2) }, () => ({
-                medicamento: getRandomElement(medicamentos),
-                dosis: ['10mg', '20mg', '500mg', '100mg', '250mg'][Math.floor(Math.random() * 5)],
-                frecuencia: ['Cada 8 horas', 'Cada 12 horas', 'Cada 24 horas', 'Dos veces al día'][Math.floor(Math.random() * 4)],
-                duracion: ['7 días', '14 días', '30 días', '90 días'][Math.floor(Math.random() * 4)],
-                indicaciones: 'Seguir indicaciones médicas. Consultar ante efectos secundarios.'
-              }))
-            }
-          }
-        });
-
-        // Crear notas clínicas ocasionales
-        if (Math.random() > 0.5) {
-          await prisma.notaClinica.create({
-            data: {
-              contenido: 'Revisión clínica completada. Paciente responde bien al tratamiento.',
-              consultaId: consulta.id,
-              autorId: medico.id
-            }
-          });
-        }
-
-        // Agregar colaboradores ocasionalmente
-        if (Math.random() > 0.7 && medicosClinica.length > 1) {
-          const colaborador = getRandomElement(medicosClinica.filter(m => m.id !== medico.id));
-          await prisma.colaboradorConsulta.create({
-            data: {
-              consultaId: consulta.id,
-              medicoId: colaborador.id
-            }
-          }).catch(() => {}); // Ignorar errores de unicidad
-        }
-      }
+      totalConsultas++;
     }
   }
+  console.log(`  ✓ Creadas ${totalConsultas} consultas clínicas con diagnósticos y tratamientos.`);
 
-  // 6. Crear citas programadas (usando raw SQL por problemas de permisos de node_modules)
-  console.log('\n📅 Creando citas...');
+  console.log('📅 Generando Citas para la Agenda...');
   let citasCount = 0;
-  for (const clinica of clinicas) {
-    const medicosClinica = Object.values(usuarios).filter(u => u.clinicaId === clinica.id && u.rol === 'MEDICO');
-    const pacientesClinica = await prisma.paciente.findMany({ where: { clinicaId: clinica.id }, take: 10 });
+  const hoy = new Date();
+  hoy.setHours(9, 0, 0, 0); // Empezar a las 9 AM
+  
+  // Citas para la semana actual
+  for (let i = -2; i <= 5; i++) { // Días desde hace 2 días hasta 5 en el futuro
+    for (let h = 9; h <= 17; h++) { // Horarios de 9 a 17 hrs
+      if (Math.random() > 0.6) continue; // No todas las horas ocupadas
+      
+      const paciente = getRandomElement(pacientes);
+      const fechaHora = new Date(hoy);
+      fechaHora.setDate(hoy.getDate() + i);
+      fechaHora.setHours(h, [0, 30][Math.floor(Math.random()*2)], 0, 0);
+      
+      let estado = 'pendiente';
+      if (i < 0) estado = 'completada';
+      if (i === 0 && Math.random() > 0.8) estado = 'cancelada';
 
-    for (const paciente of pacientesClinica) {
-      const citasP = 1 + Math.floor(Math.random() * 3);
-      for (let i = 0; i < citasP; i++) {
-        const medico = getRandomElement(medicosClinica);
-        const fechaHora = randomDate(new Date(), new Date(new Date().getFullYear(), 11, 31));
-        const id = require('crypto').randomUUID();
-        const tipo = ['consulta', 'control', 'teleconsulta'][Math.floor(Math.random() * 3)];
-        const estado = ['pendiente', 'confirmada', 'cancelada', 'completada'][Math.floor(Math.random() * 4)];
-        const duracion = 30 + Math.floor(Math.random() * 30);
-
-        try {
-          await prisma.$executeRaw`
-            INSERT INTO Cita (id, pacienteId, medicoId, fechaHora, duracion, tipo, estado, notas, creadoEn)
-            VALUES (${id}, ${paciente.id}, ${medico.id}, ${fechaHora}, ${duracion}, ${tipo}, ${estado}, 'Cita programada. Se requiere confirmación.', ${new Date()})
-          `;
-          citasCount++;
-        } catch (e) {
-          console.error(`  Error creando cita: ${e.message}`);
+      await prisma.cita.create({
+        data: {
+          pacienteId: paciente.id,
+          medicoId: demoMedico.id, // Mayormente citas para el demo medico
+          fechaHora: fechaHora,
+          duracion: 30,
+          tipo: ['Consulta General', 'Control', 'Lectura Exámenes'][Math.floor(Math.random() * 3)],
+          estado: estado,
+          notas: 'Paciente reservó vía portal web.'
         }
-      }
+      });
+      citasCount++;
     }
   }
+  console.log(`  ✓ Creadas ${citasCount} citas en la agenda.`);
 
-  console.log(`\n✅ Siembra completada con éxito!`);
-  console.log(`📊 Resumen:`);
-  console.log(`   • Clínicas: ${clinicas.length}`);
-  console.log(`   • Usuarios: ${userCount}`);
-  console.log(`   • Pacientes: ${patientCount}`);
-  console.log(`   • Diagnósticos: ${Object.keys(diagnosticos).length}`);
-  console.log(`   • Consultas: ~${patientCount * 5} (3-8 por paciente)`);
-  console.log(`   • Citas: ${citasCount}`);
-  console.log(`\n💾 Base de datos completamente poblada con datos de ejemplo!`);
+  console.log('⏳ Generando Lista de Espera (Waitlist)...');
+  // Pacientes en lista de espera de hoy
+  const waitlistCount = 5;
+  for (let i = 0; i < waitlistCount; i++) {
+    const paciente = getRandomElement(pacientes);
+    await prisma.listaEspera.create({
+      data: {
+        pacienteId: paciente.id,
+        medicoId: demoMedico.id,
+        urgencia: ['alta', 'media', 'baja'][Math.floor(Math.random() * 3)],
+        tipoRequerido: ['Urgencia menor', 'Sobre cupo', 'Control Post-Cirugía'][Math.floor(Math.random() * 3)],
+        notas: 'Disponibilidad flexible. Llamar al móvil si se libera cupo.',
+        estado: 'esperando'
+      }
+    });
+  }
+  console.log(`  ✓ Creados ${waitlistCount} pacientes en lista de espera.`);
+
+  console.log('\n🚀 ¡SEMBRADO DE DATOS EXITOSO PARA DEMO!');
+  console.log('Resumen:');
+  console.log(`- ${pacientes.length} Pacientes en la base de datos.`);
+  console.log(`- ${totalConsultas} Consultas en el historial.`);
+  console.log(`- ${citasCount} Citas en la Agenda (semana actual).`);
+  console.log(`- ${waitlistCount} Pacientes en la Lista de Espera.`);
 }
 
 main()

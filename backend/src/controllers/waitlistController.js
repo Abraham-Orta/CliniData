@@ -1,5 +1,18 @@
 const prisma = require('../config/database');
 const { waitlistSchema, waitlistUpdateSchema } = require('../utils/waitlistValidators');
+const { decrypt } = require('../utils/securityHelper');
+
+function decryptPaciente(paciente) {
+  if (!paciente) return paciente;
+  return {
+    ...paciente,
+    nombre: decrypt(paciente.nombre),
+    apellido: decrypt(paciente.apellido),
+    documentoIdentidad: decrypt(paciente.documentoIdentidad),
+    telefono: decrypt(paciente.telefono),
+    email: decrypt(paciente.email)
+  };
+}
 
 async function listWaitlist(req, res, next) {
   try {
@@ -25,7 +38,12 @@ async function listWaitlist(req, res, next) {
       return new Date(a.creadoEn) - new Date(b.creadoEn);
     });
 
-    res.json(items);
+    const decryptedItems = items.map(item => ({
+      ...item,
+      paciente: decryptPaciente(item.paciente)
+    }));
+
+    res.json(decryptedItems);
   } catch (err) {
     next(err);
   }
@@ -46,6 +64,8 @@ async function addToWaitlist(req, res, next) {
         paciente: true
       }
     });
+    
+    item.paciente = decryptPaciente(item.paciente);
     res.status(201).json(item);
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
@@ -76,6 +96,8 @@ async function updateWaitlistItem(req, res, next) {
       data,
       include: { paciente: true }
     });
+    
+    item.paciente = decryptPaciente(item.paciente);
     res.json(item);
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });

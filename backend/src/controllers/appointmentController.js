@@ -1,5 +1,18 @@
 const prisma = require('../config/database');
 const { createAppointmentSchema, updateAppointmentSchema } = require('../utils/appointmentValidators');
+const { decrypt } = require('../utils/securityHelper');
+
+function decryptPaciente(paciente) {
+  if (!paciente) return paciente;
+  return {
+    ...paciente,
+    nombre: decrypt(paciente.nombre),
+    apellido: decrypt(paciente.apellido),
+    documentoIdentidad: decrypt(paciente.documentoIdentidad),
+    telefono: decrypt(paciente.telefono),
+    email: decrypt(paciente.email)
+  };
+}
 
 async function listAppointments(req, res, next) {
   try {
@@ -11,8 +24,18 @@ async function listAppointments(req, res, next) {
     if (since) where.fechaHora.gte = new Date(since);
     if (until) where.fechaHora.lte = new Date(until);
 
-    const citas = await prisma.cita.findMany({ where, orderBy: { fechaHora: 'asc' } });
-    res.json(citas);
+    const citas = await prisma.cita.findMany({ 
+      where, 
+      include: { paciente: true },
+      orderBy: { fechaHora: 'asc' } 
+    });
+
+    const decrypted = citas.map(cita => ({
+      ...cita,
+      paciente: decryptPaciente(cita.paciente)
+    }));
+
+    res.json(decrypted);
   } catch (err) {
     next(err);
   }
@@ -21,8 +44,13 @@ async function listAppointments(req, res, next) {
 async function getAppointment(req, res, next) {
   try {
     const { id } = req.params;
-    const cita = await prisma.cita.findUnique({ where: { id } });
+    const cita = await prisma.cita.findUnique({ 
+      where: { id },
+      include: { paciente: true } 
+    });
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
+    
+    cita.paciente = decryptPaciente(cita.paciente);
     res.json(cita);
   } catch (err) {
     next(err);
@@ -32,14 +60,20 @@ async function getAppointment(req, res, next) {
 async function createAppointment(req, res, next) {
   try {
     const parsed = createAppointmentSchema.parse(req.body);
-    const cita = await prisma.cita.create({ data: {
-      pacienteId: parsed.pacienteId,
-      medicoId: parsed.medicoId,
-      fechaHora: new Date(parsed.fechaHora),
-      duracion: parsed.duracion || null,
-      tipo: parsed.tipo || null,
-      notas: parsed.notas || null,
-    }});
+    const cita = await prisma.cita.create({ 
+      data: {
+        pacienteId: parsed.pacienteId,
+        medicoId: parsed.medicoId,
+        fechaHora: new Date(parsed.fechaHora),
+        duracion: parsed.duracion || null,
+        tipo: parsed.tipo || null,
+        estado: parsed.estado || 'pendiente',
+        notas: parsed.notas || null,
+      },
+      include: { paciente: true }
+    });
+    
+    cita.paciente = decryptPaciente(cita.paciente);
     res.status(201).json(cita);
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
@@ -58,7 +92,13 @@ async function updateAppointment(req, res, next) {
     if (parsed.estado !== undefined) data.estado = parsed.estado;
     if (parsed.notas !== undefined) data.notas = parsed.notas;
 
-    const cita = await prisma.cita.update({ where: { id }, data });
+    const cita = await prisma.cita.update({ 
+      where: { id }, 
+      data,
+      include: { paciente: true } 
+    });
+    
+    cita.paciente = decryptPaciente(cita.paciente);
     res.json(cita);
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Cita no encontrada' });
