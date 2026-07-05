@@ -11,6 +11,7 @@ type ApiPatient = {
   telefono?: string | null;
   email?: string | null;
   creadoEn?: string;
+  teamCount?: number;
 };
 
 type ApiAppointment = {
@@ -105,7 +106,7 @@ export function apiPatientToUi(patient: ApiPatient): Patient {
     location: 'No especificada',
     bloodType: 'No registrado',
     allergies: 'No registradas',
-    teamCount: 1
+    teamCount: patient.teamCount || 1
   };
 }
 

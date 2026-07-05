@@ -10,7 +10,8 @@ function decryptPatient(p) {
     apellido: decrypt(p.apellido),
     documentoIdentidad: decrypt(p.documentoIdentidad),
     telefono: decrypt(p.telefono),
-    email: decrypt(p.email)
+    email: decrypt(p.email),
+    teamCount: 1 + (p.colaboradores ? p.colaboradores.length : 0)
   };
 }
 
@@ -60,7 +61,8 @@ const getAllPatients = async (req, res, next) => {
       // Try document (blind index) match first - fast and exact
       const searchDniHash = generateBlindIndex(search);
       const matchedPatient = await prisma.paciente.findFirst({
-        where: { AND: [baseWhere, { documentoIdentidadHash: searchDniHash }] }
+        where: { AND: [baseWhere, { documentoIdentidadHash: searchDniHash }] },
+        include: { colaboradores: true }
       });
 
       if (matchedPatient) {
@@ -70,7 +72,7 @@ const getAllPatients = async (req, res, next) => {
         // No exact doc match: search by nombre/apellido in decrypted data.
         // To avoid decrypting entire DB, restrict by baseWhere (access + filters) and cap results to a reasonable max.
         const MAX_DECRYPT = 1000; // safety cap
-        const allAccessible = await prisma.paciente.findMany({ where: baseWhere, orderBy: { creadoEn: 'desc' }, take: MAX_DECRYPT });
+        const allAccessible = await prisma.paciente.findMany({ where: baseWhere, orderBy: { creadoEn: 'desc' }, take: MAX_DECRYPT, include: { colaboradores: true } });
 
         const decrypted = allAccessible.map(decryptPatient);
         const searchTerm = search.toLowerCase();
@@ -89,7 +91,7 @@ const getAllPatients = async (req, res, next) => {
       // No free-text search: apply pagination server-side using baseWhere
       const skip = (page - 1) * limit;
       const [rows, count] = await Promise.all([
-        prisma.paciente.findMany({ where: baseWhere, skip, take: limit, orderBy: { creadoEn: 'desc' } }),
+        prisma.paciente.findMany({ where: baseWhere, skip, take: limit, orderBy: { creadoEn: 'desc' }, include: { colaboradores: true } }),
         prisma.paciente.count({ where: baseWhere })
       ]);
 
@@ -110,7 +112,7 @@ const getPatient = async (req, res, next) => {
       return res.json(req.paciente);
     }
 
-    const patient = await prisma.paciente.findUnique({ where: { id: req.params.id } });
+    const patient = await prisma.paciente.findUnique({ where: { id: req.params.id }, include: { colaboradores: true } });
     if (!patient) return res.status(404).json({ error: 'Paciente no encontrado.' });
 
     res.json(decryptPatient(patient));

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, Shield, ChevronDown, CheckSquare, Square, Search, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
-import { userService } from "../services/userService";
+import { colaboradorService } from "../services/colaboradorService";
 
 interface Props {
   onClose: () => void;
@@ -42,10 +42,10 @@ export function ShareModal({ onClose, patientName, onAssign }: Props) {
 
   // EFECTO 3: Cargar colegas desde la API al montar
   useEffect(() => {
-    userService.getDoctors().then((docs) => {
-      const mapped = docs.map((d) => ({
+    colaboradorService.getMedicosDisponibles().then((docs) => {
+      const mapped = docs.map((d: any) => ({
         id: d.id,
-        name: `${d.nombre || ''} ${d.apellido || ''}`.trim() || d.email,
+        name: `${d.nombre || ''} ${d.apellido || ''}`.trim() || 'Médico',
         specialty: 'Médico'
       }));
       setColleagues(mapped);

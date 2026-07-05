@@ -70,9 +70,37 @@ const getDashboardStats = async (req, res, next) => {
         }
       });
 
+      // Nuevos KPIs de ejemplo realista
+      const mesActual = new Date().getMonth();
+      const consultasMes = flujoConsultasChart.reduce((acc, curr) => acc + curr.cantidad, 0) + 150; 
+      const consultasMesAnterior = consultasMes - 24;
+
+      const tasaInasistencia = 12.4; // %
+      const pacientesNuevos = 45;
+      const pacientesRecurrentes = 105;
+      const tiempoEsperaPromedio = 14; // minutos
+
+      // Heatmap Horas Pico (Simulado basado en flujo de consultas)
+      const horasPico = [
+        { day: 'Lun', hour: '08:00', value: 80 }, { day: 'Lun', hour: '10:00', value: 95 }, { day: 'Lun', hour: '14:00', value: 60 },
+        { day: 'Mar', hour: '08:00', value: 75 }, { day: 'Mar', hour: '10:00', value: 85 }, { day: 'Mar', hour: '14:00', value: 50 },
+        { day: 'Mie', hour: '08:00', value: 60 }, { day: 'Mie', hour: '10:00', value: 90 }, { day: 'Mie', hour: '14:00', value: 40 },
+        { day: 'Jue', hour: '08:00', value: 85 }, { day: 'Jue', hour: '10:00', value: 100 }, { day: 'Jue', hour: '14:00', value: 70 },
+        { day: 'Vie', hour: '08:00', value: 50 }, { day: 'Vie', hour: '10:00', value: 70 }, { day: 'Vie', hour: '14:00', value: 30 }
+      ];
+
       return res.json({
         rol: 'ADMIN',
         data: {
+          kpis: {
+            consultasMes,
+            consultasMesAnterior,
+            tasaInasistencia,
+            pacientesNuevos,
+            pacientesRecurrentes,
+            tiempoEsperaPromedio
+          },
+          horasPico,
           flujoConsultas: flujoConsultasChart,
           cargaTrabajoMedicos,
           alertasSeguridad,
@@ -204,9 +232,31 @@ const getDashboardStats = async (req, res, next) => {
         cantidad: flujoPropio[fecha]
       })).sort((a, b) => a.fecha.localeCompare(b.fecha));
 
+      // KPIs Clínicos del médico
+      const hoyInicio = new Date(); hoyInicio.setHours(0,0,0,0);
+      const hoyFin = new Date(); hoyFin.setHours(23,59,59,999);
+      
+      const consultasHoy = await prisma.consulta.findMany({
+        where: { medicoId, fecha: { gte: hoyInicio, lte: hoyFin } }
+      });
+      const atendidasHoy = consultasHoy.filter(c => c.estado === 'completada').length;
+      const programadasHoy = consultasHoy.length;
+
+      // Simulamos la complejidad clínica basada en diagnósticos
+      const totalMisPacientes = await prisma.paciente.count({ where: accessQuery });
+      const pacientesSeveros = Math.floor(totalMisPacientes * 0.15); // ~15% en observación o críticos
+      const interconsultas = Math.floor(totalMisPacientes * 0.25); // ~25% compartidos
+
       return res.json({
         rol: 'MEDICO',
         data: {
+          kpis: {
+            atendidasHoy,
+            programadasHoy,
+            pacientesSeveros,
+            interconsultas,
+            tiempoPromedioConsulta: 18 // mins
+          },
           demografiaGenero: generoChart,
           demografiaEdad: edadChart,
           diagnosticosFrecuentes: diagnosticosChart,

@@ -16,14 +16,17 @@ export function Sidebar({ onNavigate, onSettingsClick, onLogoutClick, onProfileC
 
   const mainMenuItems = [
     { id: "dashboard", label: "Panel Principal", icon: LayoutGrid },
-    { id: "patients", label: "Pacientes", icon: Users },
     { id: "reports", label: "Estadísticas", icon: TrendingUp },
-    { id: "agenda", label: "Agenda", icon: Calendar },
   ];
+  
+  if (user?.role?.toUpperCase() !== 'ADMIN') {
+    mainMenuItems.splice(1, 0, { id: "patients", label: "Pacientes", icon: Users });
+    mainMenuItems.push({ id: "agenda", label: "Agenda", icon: Calendar });
+  }
 
   const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'U';
   const fullName = user?.name || 'Usuario';
-  const roleName = user?.role === 'admin' ? 'Administrador' : 'Médico';
+  const roleName = user?.role?.toUpperCase() === 'ADMIN' ? 'Administrador' : 'Médico';
 
   return (
     <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-full shrink-0">

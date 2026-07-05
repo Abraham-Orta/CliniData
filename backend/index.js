@@ -56,6 +56,11 @@ app.use('/api/appointments', require('./src/routes/appointments'));
 app.use('/api/waitlist', require('./src/routes/waitlist'));
 app.use('/api/dashboard', require('./src/routes/dashboard'));
 app.use('/api/auditorias', require('./src/routes/auditorias'));
+app.use('/api/colaboradores', require('./src/routes/colaboradores'));
+app.use('/api/adjuntos', require('./src/routes/adjuntos'));
+
+// Servir la carpeta de uploads estáticamente para que el frontend pueda descargar los adjuntos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Swagger UI (OpenAPI docs)
 try {
