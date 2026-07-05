@@ -47,15 +47,10 @@ export const appointmentService = {
       .slice(0, 3);
   },
 
-  getAppointmentsByDate: async (date: string, doctorName: string) => {
+  getAppointmentsByDate: async (date: string) => {
     const targetDate = new Date(`${date}T00:00:00`);
     const { since, until } = isoDayBounds(targetDate);
     const params = new URLSearchParams({ since, until });
-
-    if (doctorName !== 'Todos') {
-      const medicoId = doctorIdFromSession();
-      if (medicoId) params.set('medicoId', medicoId);
-    }
 
     const appointments = await apiClient.get<ApiAppointment[]>(`/appointments?${params.toString()}`);
     return appointments.map((a) => apiAppointmentToUi(a));

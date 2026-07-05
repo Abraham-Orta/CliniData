@@ -2,6 +2,8 @@ const prisma = require('../config/database');
 const { createAppointmentSchema, updateAppointmentSchema } = require('../utils/appointmentValidators');
 const { decrypt } = require('../utils/securityHelper');
 
+// The Prisma extension in database.js decrypts the ROOT model of each operation.
+// Nested relations loaded via `include` are NOT auto-decrypted — we must do it manually.
 function decryptPaciente(paciente) {
   if (!paciente) return paciente;
   return {
@@ -9,8 +11,8 @@ function decryptPaciente(paciente) {
     nombre: decrypt(paciente.nombre),
     apellido: decrypt(paciente.apellido),
     documentoIdentidad: decrypt(paciente.documentoIdentidad),
-    telefono: decrypt(paciente.telefono),
-    email: decrypt(paciente.email)
+    telefono: paciente.telefono ? decrypt(paciente.telefono) : null,
+    email: paciente.email ? decrypt(paciente.email) : null,
   };
 }
 
@@ -18,24 +20,28 @@ async function listAppointments(req, res, next) {
   try {
     const { medicoId, pacienteId, since, until } = req.query;
     const where = {};
-    if (medicoId) where.medicoId = medicoId;
+
+    // A doctor can only see their own appointments.
+    // An admin can filter by a specific medicoId or see all (e.g. for reporting).
+    if (req.userRole === 'ADMIN') {
+      if (medicoId) where.medicoId = medicoId;
+    } else {
+      // MEDICO: always scope to the authenticated doctor, ignore any medicoId from query
+      where.medicoId = req.userId;
+    }
+
     if (pacienteId) where.pacienteId = pacienteId;
     if (since || until) where.fechaHora = {};
     if (since) where.fechaHora.gte = new Date(since);
     if (until) where.fechaHora.lte = new Date(until);
 
-    const citas = await prisma.cita.findMany({ 
-      where, 
+    const citas = await prisma.cita.findMany({
+      where,
       include: { paciente: true },
-      orderBy: { fechaHora: 'asc' } 
+      orderBy: { fechaHora: 'asc' }
     });
 
-    const decrypted = citas.map(cita => ({
-      ...cita,
-      paciente: decryptPaciente(cita.paciente)
-    }));
-
-    res.json(decrypted);
+    res.json(citas.map(cita => ({ ...cita, paciente: decryptPaciente(cita.paciente) })));
   } catch (err) {
     next(err);
   }
@@ -44,12 +50,12 @@ async function listAppointments(req, res, next) {
 async function getAppointment(req, res, next) {
   try {
     const { id } = req.params;
-    const cita = await prisma.cita.findUnique({ 
+    const cita = await prisma.cita.findUnique({
       where: { id },
-      include: { paciente: true } 
+      include: { paciente: true }
     });
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
-    
+
     cita.paciente = decryptPaciente(cita.paciente);
     res.json(cita);
   } catch (err) {
@@ -60,7 +66,7 @@ async function getAppointment(req, res, next) {
 async function createAppointment(req, res, next) {
   try {
     const parsed = createAppointmentSchema.parse(req.body);
-    const cita = await prisma.cita.create({ 
+    const cita = await prisma.cita.create({
       data: {
         pacienteId: parsed.pacienteId,
         medicoId: parsed.medicoId,
@@ -72,7 +78,7 @@ async function createAppointment(req, res, next) {
       },
       include: { paciente: true }
     });
-    
+
     cita.paciente = decryptPaciente(cita.paciente);
     res.status(201).json(cita);
   } catch (err) {
@@ -92,12 +98,12 @@ async function updateAppointment(req, res, next) {
     if (parsed.estado !== undefined) data.estado = parsed.estado;
     if (parsed.notas !== undefined) data.notas = parsed.notas;
 
-    const cita = await prisma.cita.update({ 
-      where: { id }, 
+    const cita = await prisma.cita.update({
+      where: { id },
       data,
-      include: { paciente: true } 
+      include: { paciente: true }
     });
-    
+
     cita.paciente = decryptPaciente(cita.paciente);
     res.json(cita);
   } catch (err) {
