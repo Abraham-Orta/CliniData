@@ -1,6 +1,8 @@
 const { patientSchema } = require('../utils/patientValidators');
 const prisma = require('../config/database');
 const { generateBlindIndex, encrypt } = require('../utils/securityHelper');
+const { audit } = require('../utils/auditLogger');
+
 
 function decryptPatient(p) {
   if (!p) return null;
@@ -104,7 +106,9 @@ const getAllPatients = async (req, res, next) => {
       total = count;
     }
 
+    await audit(req, 'VER_LISTA_PACIENTES', `Consultados ${patients.length} pacientes (página ${page}, búsqueda: "${search || 'ninguna'}")`);
     res.json({ data: patients, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+
   } catch (err) {
     next(err);
   }
@@ -119,8 +123,10 @@ const getPatient = async (req, res, next) => {
 
     const patient = await prisma.paciente.findUnique({ where: { id: req.params.id }, include: { consultas: { include: { colaboradores: true } } } });
     if (!patient) return res.status(404).json({ error: 'Paciente no encontrado.' });
+    const result = decryptPatient(patient);
+    await audit(req, 'VER_HISTORIAL_PACIENTE', `Acceso al expediente del paciente ID: ${req.params.id}`);
+    res.json(result);
 
-    res.json(decryptPatient(patient));
   } catch (err) {
     next(err);
   }
@@ -158,7 +164,8 @@ const createPatient = async (req, res, next) => {
 
     const patient = await prisma.paciente.create({ data: toStore });
 
-    await prisma.auditoria.create({ data: { accion: 'CREAR_PACIENTE', detalles: `Médico creó el expediente del paciente ID: ${patient.id}`, ipAddress: req.ip || '127.0.0.1', usuarioId: medicoId } }).catch(() => null);
+    await audit(req, 'CREAR_PACIENTE', `Médico creó el expediente del paciente ID: ${patient.id}`);
+
 
     res.status(201).json(decryptPatient(patient));
   } catch (err) {
@@ -189,7 +196,8 @@ const updatePatient = async (req, res, next) => {
 
     const patient = await prisma.paciente.update({ where: { id: patientId }, data });
 
-    await prisma.auditoria.create({ data: { accion: 'ACTUALIZAR_PACIENTE', detalles: `Médico actualizó el expediente del paciente ID: ${patient.id}`, ipAddress: req.ip || '127.0.0.1', usuarioId: req.userId } }).catch(() => null);
+    await audit(req, 'ACTUALIZAR_PACIENTE', `Médico actualizó el expediente del paciente ID: ${patient.id}`);
+
 
     res.json(decryptPatient(patient));
   } catch (err) {
@@ -205,7 +213,8 @@ const deletePatient = async (req, res, next) => {
 
     await prisma.paciente.delete({ where: { id: patientId } });
 
-    await prisma.auditoria.create({ data: { accion: 'ELIMINAR_PACIENTE', detalles: `Administrador eliminó físicamente el expediente del paciente ID: ${patientId}`, ipAddress: req.ip || '127.0.0.1', usuarioId: req.userId } }).catch(() => null);
+    await audit(req, 'ELIMINAR_PACIENTE', `Usuario eliminó físicamente el expediente del paciente ID: ${patientId}`);
+
 
     res.status(204).end();
   } catch (err) {

@@ -268,7 +268,7 @@ async function main() {
           duracion: 30,
           tipo: ['Consulta General', 'Control', 'Lectura Exámenes'][Math.floor(Math.random() * 3)],
           estado: estado,
-          notas: 'Paciente reservó vía portal web.'
+          notas: 'Cita agendada por recepción para control de rutina.'
         }
       });
       citasCount++;

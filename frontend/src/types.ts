@@ -58,6 +58,7 @@ export interface GlobalVisit {
   notes: string;
   prescriptions: string[];
   visitType: string;
+  doctorId?: string;
   isReadmission?: boolean; // Added for advanced metrics
   isResolved?: boolean; // Added for advanced metrics
 }
@@ -78,4 +79,19 @@ export interface SystemEvent {
 export type ExtendedPatient = Patient;
 export type GlobalAppointment = Appointment;
 export type VisitRecord = GlobalVisit;
+
+export interface AuditLog {
+  id: string;
+  accion: string;
+  detalles: string;
+  ipAddress: string;
+  fecha: string;
+  usuario?: {
+    id: string;
+    nombre: string;
+    email: string;
+    rol: string;
+  } | null;
+}
+
 

@@ -8,7 +8,7 @@ export const visitService = {
     return consultas.map(apiConsultaToVisit);
   },
 
-  addVisit: async (data: Omit<GlobalVisit, "id">) => {
+  addVisit: async (data: Omit<GlobalVisit, "id"> & { triage?: any }) => {
     const payload = {
       pacienteId: data.patientId,
       motivo: data.diagnosis || 'Consulta general',
@@ -24,6 +24,27 @@ export const visitService = {
       }))
     };
 
+    if (data.triage) {
+      Object.assign(payload, data.triage);
+    }
+
+    const created = await apiClient.post<any>('/consultas', payload);
+    return apiConsultaToVisit(created);
+  },
+
+  createTriage: async (patientId: string, triageData: any) => {
+    const payload = {
+      pacienteId: patientId,
+      motivo: triageData.motivo || 'Triaje Inicial',
+      sintomas: null,
+      observaciones: triageData.observaciones || 'Triaje realizado por Enfermería',
+      presionArterial: triageData.presionArterial,
+      temperatura: parseFloat(triageData.temperatura) || null,
+      frecuenciaCardiaca: parseInt(triageData.frecuenciaCardiaca) || null,
+      peso: parseFloat(triageData.peso) || null,
+      diagnosticos: [],
+      tratamientos: []
+    };
     const created = await apiClient.post<any>('/consultas', payload);
     return apiConsultaToVisit(created);
   }

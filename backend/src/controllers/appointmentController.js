@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const { createAppointmentSchema, updateAppointmentSchema } = require('../utils/appointmentValidators');
 const { decrypt } = require('../utils/securityHelper');
+const { audit } = require('../utils/auditLogger');
 
 // The Prisma extension in database.js decrypts the ROOT model of each operation.
 // Nested relations loaded via `include` are NOT auto-decrypted — we must do it manually.
@@ -23,7 +24,7 @@ async function listAppointments(req, res, next) {
 
     // A doctor can only see their own appointments.
     // An admin can filter by a specific medicoId or see all (e.g. for reporting).
-    if (req.userRole === 'ADMIN') {
+    if (req.userRole === 'ADMIN' || req.userRole === 'ENFERMERO') {
       if (medicoId) where.medicoId = medicoId;
     } else {
       // MEDICO: always scope to the authenticated doctor, ignore any medicoId from query
@@ -41,7 +42,9 @@ async function listAppointments(req, res, next) {
       orderBy: { fechaHora: 'asc' }
     });
 
-    res.json(citas.map(cita => ({ ...cita, paciente: decryptPaciente(cita.paciente) })));
+    const result = citas.map(cita => ({ ...cita, paciente: decryptPaciente(cita.paciente) }));
+    await audit(req, 'VER_CITAS', `Consultadas ${result.length} citas`);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -57,6 +60,7 @@ async function getAppointment(req, res, next) {
     if (!cita) return res.status(404).json({ error: 'Cita no encontrada' });
 
     cita.paciente = decryptPaciente(cita.paciente);
+    await audit(req, 'VER_CITA_DETALLE', `Acceso a cita ID: ${id}`);
     res.json(cita);
   } catch (err) {
     next(err);
@@ -80,6 +84,7 @@ async function createAppointment(req, res, next) {
     });
 
     cita.paciente = decryptPaciente(cita.paciente);
+    await audit(req, 'CREAR_CITA', `Cita creada ID: ${cita.id} para paciente ID: ${cita.pacienteId}`);
     res.status(201).json(cita);
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ error: err.errors });
@@ -105,6 +110,7 @@ async function updateAppointment(req, res, next) {
     });
 
     cita.paciente = decryptPaciente(cita.paciente);
+    await audit(req, 'ACTUALIZAR_CITA', `Cita actualizada ID: ${id}`);
     res.json(cita);
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Cita no encontrada' });
@@ -117,6 +123,7 @@ async function deleteAppointment(req, res, next) {
   try {
     const { id } = req.params;
     await prisma.cita.delete({ where: { id } });
+    await audit(req, 'ELIMINAR_CITA', `Cita eliminada ID: ${id}`);
     res.status(204).send();
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Cita no encontrada' });

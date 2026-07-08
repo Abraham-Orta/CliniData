@@ -44,7 +44,17 @@ export const appointmentService = {
     return appointments
       .map((a) => apiAppointmentToUi(a))
       .filter((a) => a.status !== 'cancelada')
-      .slice(0, 3);
+      .sort((a, b) => {
+        // Confirmada = En Sala de Espera / Listo para doctor
+        if (a.status === 'confirmada' && b.status !== 'confirmada') return -1;
+        if (b.status === 'confirmada' && a.status !== 'confirmada') return 1;
+        // Pendiente = Agendado pero no ha llegado
+        if (a.status === 'pendiente' && b.status !== 'pendiente') return -1;
+        if (b.status === 'pendiente' && a.status !== 'pendiente') return 1;
+        // Ordenar por hora si tienen el mismo estado
+        return a.time.localeCompare(b.time);
+      })
+      .slice(0, 10);
   },
 
   getAppointmentsByDate: async (date: string) => {

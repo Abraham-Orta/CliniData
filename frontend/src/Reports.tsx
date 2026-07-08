@@ -27,40 +27,40 @@ export function Reports({ globalState, onNavigate, onLogout, onSettings, onProfi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleExportPDF = () => {
+  const handleExportEPI12 = () => {
     const doc = new jsPDF();
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("Centro de Inteligencia - CliniData", 14, 22);
-
+    doc.setFontSize(16);
+    doc.text("Ministerio del Poder Popular para la Salud", 14, 20);
     doc.setFontSize(14);
-    doc.text("Resumen Ejecutivo:", 14, 35);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-
-    if (globalStats) {
-      doc.text(`Total de Pacientes Activos: ${globalStats.totalPatients}`, 14, 45);
-      doc.text(`Pacientes en Estado Crítico: ${globalStats.criticalPatients}`, 14, 52);
-      doc.text(`Tasa de Finalización de Consultas: ${globalStats.completionRate}%`, 14, 59);
-    }
+    doc.text("Formato SIS-04 / EPI-12 - Consolidado Semanal de Enfermedades de Notificación Obligatoria", 14, 30);
     
-    // Gráfico trends data table
-    doc.setFont("helvetica", "bold");
+    // Simular exportación EPI-12
+    const data = topConditions?.slice(0, 5).map((c: any) => [c.name, c.count.toString(), "Sospechoso"]) || [];
+    autoTable(doc, {
+      startY: 40,
+      head: [["Enfermedad (CIE-10)", "N° Casos", "Clasificación"]],
+      body: data,
+      theme: "grid"
+    });
+    doc.save(`EPI-12_Semana_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const handleExportEPI15 = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text("Ministerio del Poder Popular para la Salud", 14, 20);
     doc.setFontSize(14);
-    doc.text("Evolución de Consultas e Ingresos (Últimos 6 meses):", 14, 75);
+    doc.text("Formato SIS-04 / EPI-15 - Consolidado Mensual de Morbilidad General", 14, 30);
     
-    if (trends && trends.length > 0) {
-      const tableData = trends.map((t: any) => [t.name, t.consultas.toString(), t.ingresos.toString()]);
-      autoTable(doc, {
-        startY: 82,
-        head: [["Mes", "Consultas", "Ingresos"]],
-        body: tableData,
-        theme: "striped",
-        headStyles: { fillColor: [11, 83, 148] }
-      });
-    }
-
-    doc.save(`Clinidata_Reporte_${new Date().toISOString().split('T')[0]}.pdf`);
+    // Simular exportación EPI-15
+    const data = topConditions?.map((c: any) => [c.name, c.count.toString()]) || [];
+    autoTable(doc, {
+      startY: 40,
+      head: [["Causa de Consulta", "Total Casos Atendidos"]],
+      body: data,
+      theme: "grid"
+    });
+    doc.save(`EPI-15_Mensual_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const isLoading = loadingStats || loadingDemographics || loadingTrends || loadingAdvanced || loadingConditions;
@@ -78,12 +78,20 @@ export function Reports({ globalState, onNavigate, onLogout, onSettings, onProfi
           </div>
           <div className="flex items-center gap-4">
             <button 
-              onClick={handleExportPDF}
+              onClick={handleExportEPI12}
               disabled={isLoading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl font-bold shadow-sm hover:bg-rose-100 transition-all disabled:opacity-50"
             >
               <Download size={18} />
-              Exportar Reporte (PDF)
+              Generar EPI-12 Semanal
+            </button>
+            <button 
+              onClick={handleExportEPI15}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-5 py-2.5 bg-cyan-50 border border-cyan-200 text-cyan-700 rounded-xl font-bold shadow-sm hover:bg-cyan-100 transition-all disabled:opacity-50"
+            >
+              <Download size={18} />
+              Generar EPI-15 Mensual
             </button>
             <div className="w-px h-8 bg-slate-200 mx-2"></div>
             <NotificationBell globalState={globalState} />
@@ -115,72 +123,35 @@ export function Reports({ globalState, onNavigate, onLogout, onSettings, onProfi
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <AlertTriangle size={48} className="text-red-500" />
+                <AlertTriangle size={48} className="text-amber-500" />
               </div>
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Casos Críticos</h3>
+              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Tasa Ausentismo (No-shows)</h3>
               <div className="text-4xl font-extrabold text-slate-900">
-                {loadingStats ? <Loader2 className="animate-spin text-slate-400" size={32} /> : globalStats?.criticalPatients || 0}
+                {loadingAdvanced ? <Loader2 className="animate-spin text-slate-400" size={32} /> : `${advancedMetrics?.noShowRate || 0}%`}
               </div>
+              <p className="text-xs text-slate-400 mt-2">Pacientes que no asisten a cita</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Clock size={48} className="text-amber-500" />
+                <Clock size={48} className="text-[#0E7490]" />
               </div>
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Prm. Espera (m)</h3>
+              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Prm. Espera (min)</h3>
               <div className="text-4xl font-extrabold text-slate-900">
                 {loadingAdvanced ? <Loader2 className="animate-spin text-slate-400" size={32} /> : advancedMetrics?.averageWaitTime || 0}
               </div>
+              <p className="text-xs text-slate-400 mt-2">Desde llegada a consulta médica</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <TrendingUp size={48} className="text-cyan-500" />
+                <TrendingUp size={48} className="text-emerald-500" />
               </div>
               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Ratio Finalización</h3>
               <div className="text-4xl font-extrabold text-slate-900">
-                {loadingStats ? <Loader2 className="animate-spin text-slate-400" size={32} /> : `${globalStats?.completionRate || 0}%`}
+                {loadingAdvanced ? <Loader2 className="animate-spin text-slate-400" size={32} /> : `${advancedMetrics?.completedRate || 0}%`}
               </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <BedDouble size={48} className="text-purple-500" />
-              </div>
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Ocupación Camas</h3>
-              <div className="text-4xl font-extrabold text-slate-900">
-                {loadingAdvanced ? <Loader2 className="animate-spin text-slate-400" size={32} /> : `${advancedMetrics?.bedOccupancy || 0}%`}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Activity size={48} className="text-rose-500" />
-              </div>
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Tasa Readmisión</h3>
-              <div className="text-4xl font-extrabold text-slate-900">
-                {loadingAdvanced ? <Loader2 className="animate-spin text-slate-400" size={32} /> : `${advancedMetrics?.readmissionRate || 0}%`}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <ShieldCheck size={48} className="text-emerald-500" />
-              </div>
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Resolutividad</h3>
-              <div className="text-4xl font-extrabold text-slate-900">
-                {loadingAdvanced ? <Loader2 className="animate-spin text-slate-400" size={32} /> : `${advancedMetrics?.resolutivityRate || 0}%`}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-                <CheckCircle size={48} className="text-[#0B5394]" />
-              </div>
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Completadas</h3>
-              <div className="text-4xl font-extrabold text-slate-900">
-                {loadingStats ? <Loader2 className="animate-spin text-slate-400" size={32} /> : globalStats?.completedAppointments || 0}
-              </div>
+              <p className="text-xs text-slate-400 mt-2">Citas concretadas con éxito</p>
             </div>
           </div>
 
@@ -189,7 +160,7 @@ export function Reports({ globalState, onNavigate, onLogout, onSettings, onProfi
             {/* AREA CHART - TENDENCIAS */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col h-[400px]">
               <div className="mb-6">
-                <h2 className="text-lg font-bold text-slate-900">Evolución de Consultas e Ingresos</h2>
+                <h2 className="text-lg font-bold text-slate-900">Evolución de Consultas y Atendidos</h2>
                 <p className="text-sm text-slate-500">Volumen histórico de los últimos 6 meses</p>
               </div>
               <div className="flex-1 w-full min-h-0">
@@ -209,8 +180,8 @@ export function Reports({ globalState, onNavigate, onLogout, onSettings, onProfi
                       <RechartsTooltip 
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
                       />
-                      <Area type="monotone" dataKey="consultas" stroke="#0E7490" strokeWidth={3} fillOpacity={1} fill="url(#colorConsultas)" activeDot={{ r: 6, strokeWidth: 0, fill: '#0E7490' }} />
-                      <Area type="monotone" dataKey="ingresos" stroke="#94A3B8" strokeWidth={2} fillOpacity={0} strokeDasharray="5 5" />
+                      <Area type="monotone" name="Total Agendado" dataKey="consultas" stroke="#0E7490" strokeWidth={3} fillOpacity={1} fill="url(#colorConsultas)" activeDot={{ r: 6, strokeWidth: 0, fill: '#0E7490' }} />
+                      <Area type="monotone" name="Pacientes Atendidos" dataKey="atendidos" stroke="#94A3B8" strokeWidth={2} fillOpacity={0} strokeDasharray="5 5" />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}

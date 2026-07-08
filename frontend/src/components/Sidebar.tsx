@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { LayoutGrid, Users, FileText, Calendar, TrendingUp, Settings, LogOut } from "lucide-react";
+import { LayoutGrid, Users, FileText, Calendar, TrendingUp, Settings, LogOut, ShieldAlert, Activity } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 interface SidebarProps {
@@ -9,20 +9,37 @@ interface SidebarProps {
   onProfileClick?: () => void;
 }
 
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: any;
+  badge?: string | number;
+}
+
 export function Sidebar({ onNavigate, onSettingsClick, onLogoutClick, onProfileClick }: SidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname.split("/")[1] || "dashboard";
   const { user } = useAuth();
 
-  const mainMenuItems = [
-    { id: "dashboard", label: "Panel Principal", icon: LayoutGrid },
-    { id: "reports", label: "Estadísticas", icon: TrendingUp },
-  ];
-  
-  if (user?.role?.toUpperCase() !== 'ADMIN') {
-    mainMenuItems.splice(1, 0, { id: "patients", label: "Pacientes", icon: Users });
+  const mainMenuItems: MenuItem[] = [];
+
+  if (user?.role?.toUpperCase() === 'ADMIN') {
+    mainMenuItems.push({ id: "dashboard", label: "Panel Principal", icon: LayoutGrid });
+    mainMenuItems.push({ id: "reports", label: "Estadísticas", icon: TrendingUp });
+    mainMenuItems.push({ id: "audits", label: "Auditorías", icon: ShieldAlert });
+  } else if (user?.role?.toUpperCase() === 'ENFERMERO') {
+    mainMenuItems.push({ id: "triage", label: "Triaje", icon: Activity });
+    mainMenuItems.push({ id: "patients", label: "Pacientes", icon: Users });
     mainMenuItems.push({ id: "agenda", label: "Agenda", icon: Calendar });
+  } else {
+    // Médico por defecto
+    mainMenuItems.push({ id: "dashboard", label: "Panel Principal", icon: LayoutGrid });
+    mainMenuItems.push({ id: "patients", label: "Pacientes", icon: Users });
+    mainMenuItems.push({ id: "agenda", label: "Agenda", icon: Calendar });
+    mainMenuItems.push({ id: "reports", label: "Estadísticas", icon: TrendingUp });
   }
+
+
 
   const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'U';
   const fullName = user?.name || 'Usuario';

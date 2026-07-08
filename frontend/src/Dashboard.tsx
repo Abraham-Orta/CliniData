@@ -248,7 +248,7 @@ export function Dashboard({ globalState, onNavigate, onLogout, onSettings, onPro
                   <div className="flex items-center justify-between mb-5">
                     <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                       {isAdmin ? <Shield size={18} className="text-[#0E7490]" /> : <Clock size={18} className="text-[#0E7490]" />}
-                      {isAdmin ? "Auditorías de Seguridad" : "Próximas Consultas"}
+                      {isAdmin ? "Auditorías de Seguridad" : "Sala de Espera (Hoy)"}
                     </h2>
                   </div>
                   
@@ -264,14 +264,33 @@ export function Dashboard({ globalState, onNavigate, onLogout, onSettings, onPro
                       isLoadingAppointments ? <Loader2 size={20} className="animate-spin mx-auto text-[#0E7490] mt-10" /> :
                       proximasConsultas.length > 0 ? proximasConsultas.map((app: any) => {
                         const config = typeConfig[app.type] || typeConfig.rutina;
+                        const isReady = app.status === 'confirmada';
+                        const isPending = app.status === 'pendiente';
+
                         return (
-                          <div key={app.id} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors group">
+                          <div key={app.id} className={`flex items-center justify-between p-3.5 rounded-xl border transition-colors group ${isReady ? 'bg-emerald-50/50 border-emerald-200 shadow-[0_2px_10px_rgba(16,185,129,0.1)]' : 'bg-slate-50/50 border-slate-100 hover:bg-slate-50'}`}>
                             <div>
-                              <p className="text-[10px] font-bold text-[#0E7490] mb-0.5">{app.time}</p>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <p className={`text-[10px] font-bold ${isReady ? 'text-emerald-700' : 'text-[#0E7490]'}`}>{app.time}</p>
+                                {isReady && <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[8px] uppercase tracking-wider font-bold rounded">Listo</span>}
+                                {isPending && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[8px] uppercase tracking-wider font-bold rounded">Triaje Pdt.</span>}
+                              </div>
                               <p className="text-xs font-bold text-slate-900 mb-1">{app.patientName}</p>
                               <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md ${config.bg} ${config.text}`}>{config.label}</span>
                             </div>
-                            <button onClick={() => onNavigate("agenda")} className="w-8 h-8 rounded-full bg-white border border-slate-200 text-[#0E7490] flex items-center justify-center hover:bg-[#0E7490] hover:text-white transition-all"><ArrowRight size={14} /></button>
+                            <button 
+                              onClick={() => {
+                                if (isReady && globalState?.handleStartConsultation) {
+                                  globalState.handleStartConsultation(app, app.patientId);
+                                } else {
+                                  onNavigate("agenda");
+                                }
+                              }} 
+                              title={isReady ? "Atender Paciente" : "Ver en Agenda"}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isReady ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:scale-105' : 'bg-white border border-slate-200 text-[#0E7490] hover:bg-[#0E7490] hover:text-white'}`}
+                            >
+                              <ArrowRight size={14} />
+                            </button>
                           </div>
                         )
                       }) : <p className="text-sm text-slate-500 text-center mt-10">Agenda libre por hoy.</p>

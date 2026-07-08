@@ -29,7 +29,7 @@ type ApiConsulta = {
   id: string;
   pacienteId: string;
   fecha?: string;
-  medico?: { nombre?: string; apellido?: string } | null;
+  medico?: { id?: string; nombre?: string; apellido?: string } | null;
   motivo?: string | null;
   observaciones?: string | null;
   tratamientos?: Array<{ medicamento?: string | null }> | null;
@@ -172,6 +172,7 @@ export function apiConsultaToVisit(consulta: ApiConsulta): GlobalVisit {
     rawTime: `${String(safe.getHours()).padStart(2, '0')}:${String(safe.getMinutes()).padStart(2, '0')}`,
     doctorName,
     doctorSpecialty: 'Medicina',
+    doctorId: consulta.medico?.id || '',
     diagnosis: consulta.motivo || 'Consulta general',
     notes: consulta.observaciones || '',
     prescriptions: (consulta.tratamientos || []).map((t) => t.medicamento || '').filter(Boolean),

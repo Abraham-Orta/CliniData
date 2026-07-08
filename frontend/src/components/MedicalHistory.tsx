@@ -8,6 +8,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { type Patient } from "./PatientCard";
 import { ShareModal } from "./ShareModal"; 
+import { ReferralModal } from "./ReferralModal";
+
 import { useAuth } from "../context/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { visitService } from "../services/visitService";
@@ -128,9 +130,10 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
   // Modales
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [isBloodOpen, setIsBloodOpen] = useState(false);
+  const [isBloodOpen, setIsBloodOpen] = useState(false); 
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [isVisitTypeOpen, setIsVisitTypeOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
 
   // Formularios pre-cargados
   const [editForm, setEditForm] = useState({ name: currentPatient.name, age: currentPatient.age.toString(), condition: currentPatient.condition, status: currentPatient.status, phone: currentPatient.phone || "", location: currentPatient.location || "", bloodType: currentPatient.bloodType || "O+", allergies: currentPatient.allergies || "", documentId: "" });
@@ -162,10 +165,10 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
 
   // Manejo del scroll del body al abrir modales
   useEffect(() => {
-    if (isEditModalOpen || isShareModalOpen || isVisitModalOpen || doctorToRemove !== null) document.body.style.overflow = "hidden";
+    if (isEditModalOpen || isShareModalOpen || isVisitModalOpen || isReferralModalOpen || doctorToRemove !== null) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "unset";
     return () => { document.body.style.overflow = "unset"; };
-  }, [isEditModalOpen, isShareModalOpen, isVisitModalOpen, doctorToRemove]);
+  }, [isEditModalOpen, isShareModalOpen, isVisitModalOpen, isReferralModalOpen, doctorToRemove]);
 
   // --- MANEJADORES DE EXPORTACIÓN Y MODALES ---
   const handleExportPDF = () => {
@@ -331,7 +334,12 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
       const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
       const dateStr = `${d.getDate()} ${months[d.getMonth()]}, ${d.getFullYear()}`;
       const dayStr = days[d.getDay()];
-      let [h, m] = visitForm.rawTime.split(':'); let hours = parseInt(h); const ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12; const timeStr = `${hours}:${m} ${ampm}`;
+      const timeInput = visitForm.rawTime || '09:00';
+      let [h, m] = timeInput.split(':'); 
+      let hours = parseInt(h || '9'); 
+      const ampm = hours >= 12 ? 'PM' : 'AM'; 
+      hours = hours % 12 || 12; 
+      const timeStr = `${hours}:${m || '00'} ${ampm}`;
       const rxArray = visitForm.prescriptions.split(',').map(s => s.trim()).filter(s => s);
 
       if (visitForm.id) {
@@ -361,8 +369,9 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
       }
 
       setIsVisitModalOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(`Error al registrar la visita: ${err.message || 'Error de conexión con el servidor.'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -502,6 +511,9 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
               <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
                 <Download size={14} /> Exportar
               </button>
+              <button onClick={() => setIsReferralModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all border border-indigo-200">
+                <Users size={14} /> Referir Especialista
+              </button>
               <button onClick={openNewVisitModal} className="px-4 py-2.5 flex items-center gap-2 text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(11,83,148,0.35)] hover:shadow-[0_6px_20px_rgba(11,83,148,0.45)] hover:-translate-y-0.5 bg-gradient-to-r from-[#0B5394] to-[#0E7490] transition-all duration-200"><Plus size={15} /> Nueva Visita</button>
             </div>
           </div>
@@ -532,7 +544,9 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
                                 <div className="flex items-center gap-2 mb-1 text-sm font-bold text-slate-800"><Calendar size={13} className="text-slate-400" /> {record.dayOfWeek}, {record.date}</div>
                                 <div className="flex items-center gap-2 text-sm text-slate-500"><Clock size={13} className="text-slate-400" /> {record.time}</div>
                               </div>
-                              <button onClick={() => openEditVisitModal(record)} className="p-2 text-slate-400 hover:text-[#0E7490] hover:bg-cyan-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Editar visita"><Edit3 size={18} /></button>
+                              {record.doctorId === CURRENT_USER_ID && (
+                                <button onClick={() => openEditVisitModal(record)} className="p-2 text-slate-400 hover:text-[#0E7490] hover:bg-cyan-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Editar visita"><Edit3 size={18} /></button>
+                              )}
                             </div>
                             <div className="h-px bg-slate-100 mb-4" />
                             <div className="flex items-center gap-3 mb-4">
@@ -694,6 +708,20 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
           </div>
         </div>
       )}
+      {/* --- MODAL REFERIR A ESPECIALISTA --- */}
+      {isReferralModalOpen && (
+        <ReferralModal
+          onClose={() => setIsReferralModalOpen(false)}
+          patientId={currentPatient.id}
+          patientName={currentPatient.name}
+          onReferralSuccess={() => {
+            if (setEvents) {
+              setEvents([{ id: `ev-${Date.now()}`, type: "appointment", doctorName: CURRENT_USER_NAME, action: "ha referido a un especialista a", patientName: currentPatient.name, timeAgo: "Justo ahora", read: false, patientId: currentPatient.id }, ...events]);
+            }
+          }}
+        />
+      )}
+
     </div>
   );
 }

@@ -58,13 +58,15 @@ export const reportsService = {
     const appointments = await apiClient.get<any[]>('/appointments');
     const total = (appointments || []).length;
     const completed = (appointments || []).filter((a) => a.estado === 'completada').length;
+    const canceladas = (appointments || []).filter((a) => a.estado === 'cancelada').length;
+
+    const noShowRate = total > 0 ? Number(((canceladas / total) * 100).toFixed(1)) : 0;
+    const completadasRate = total > 0 ? Number(((completed / total) * 100).toFixed(1)) : 0;
 
     return {
-      // TODO: Métricas no disponibles desde el backend actual
-      bedOccupancy: 0,
-      averageWaitTime: 24,
-      readmissionRate: 0,
-      resolutivityRate: total > 0 ? Number(((completed / total) * 100).toFixed(1)) : 0,
+      averageWaitTime: 24, // En minutos (estimado)
+      noShowRate: noShowRate,
+      completedRate: completadasRate
     };
   },
 
@@ -101,7 +103,7 @@ export const reportsService = {
       .map(([key, value]) => {
         const [y, m] = key.split('-').map(Number);
         const date = new Date(y, m, 1);
-        return { name: monthLabel(date), consultas: value.consultas, ingresos: value.ingresos, sort: date.getTime() };
+        return { name: monthLabel(date), consultas: value.consultas, atendidos: value.ingresos, sort: date.getTime() };
       })
       .sort((a, b) => a.sort - b.sort)
       .map(({ sort, ...rest }) => rest);

@@ -29,7 +29,7 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // --- CAPA 2 SEGURIDAD: Rate Limiting para evitar fuerza bruta y abuso ---
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Limita cada IP a 100 peticiones por ventana
+  max: 10000, // Aumentado para desarrollo
   message: { error: 'Demasiadas peticiones desde esta dirección IP. Intente de nuevo en 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -37,7 +37,7 @@ const generalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 20, // Limita a 20 intentos de login/registro cada 15 minutos
+  max: 5000, // Aumentado para desarrollo
   message: { error: 'Demasiados intentos de autenticación. Intente de nuevo en 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,

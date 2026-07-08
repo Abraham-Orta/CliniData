@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useIdleTimeout } from '../hooks/useIdleTimeout';
+
 
 interface User {
   id: string;
@@ -58,12 +60,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     navigate(origin);
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     setUser(null);
     navigate('/login', { replace: true });
-  };
+  }, [navigate]);
+
+  useIdleTimeout({
+    onIdle: () => {
+      if (user) {
+        // Only trigger logout if there is an active session
+        alert('Por motivos de seguridad, tu sesión ha expirado tras 15 minutos de inactividad.');
+        logout();
+      }
+    },
+    idleTimeMinutes: 15
+  });
+
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>

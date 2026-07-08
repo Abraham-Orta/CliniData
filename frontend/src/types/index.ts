@@ -55,3 +55,17 @@ export interface SystemEvent {
   patientId?: string;
   targetUser?: string;
 }
+
+export interface AuditLog {
+  id: string;
+  accion: string;
+  detalles: string;
+  ipAddress: string;
+  fecha: string;
+  usuario?: {
+    id: string;
+    nombre: string;
+    email: string;
+    rol: string;
+  } | null;
+}
