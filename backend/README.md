@@ -14,7 +14,7 @@ Instalación y arranque:
    cd backend && npm install
 3. Generar Prisma y DB:
    npx prisma generate && npx prisma db push
-4. Sembrar datos de ejemplo (crea admin y médicos):
+4. Sembrar datos de ejemplo (crea datos masivos con Faker: pacientes, visitas, admin, médicos):
    npm run seed
 5. Arrancar servidor en desarrollo:
    npm run dev

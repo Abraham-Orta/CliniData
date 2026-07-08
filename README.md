@@ -13,6 +13,7 @@ Plataforma clínica full-stack para gestión de pacientes, consultas, adjuntos, 
 - [API OpenAPI](./backend/openapi.yaml)
 - [Documentación técnica](./backend/docs/api_documentation.md)
 - [Frontend README](./frontend/README.md)
+- [Arquitectura y Estadísticas (Venezuela)](./docs/estadisticas_analisis_venezuela.md)
 
 ## Estructura
 
@@ -29,12 +30,13 @@ Plataforma clínica full-stack para gestión de pacientes, consultas, adjuntos, 
 
 ## Funcionalidades
 
-- Autenticación con JWT.
-- Gestión de pacientes.
-- Consultas médicas con colaboradores, notas clínicas y adjuntos.
-- Control de acceso clínico (RBAC/ReBAC).
+- Autenticación con JWT y control de roles (ADMIN, MEDICO, ENFERMERO).
+- Gestión de pacientes e historias clínicas cifradas (AES-256-GCM).
+- **Módulo de Triaje**: Sala de espera en tiempo real para médicos y enfermeros.
+- Consultas médicas con regla estricta de autoría (solo el creador edita su historia clínica).
+- Control de acceso clínico (RBAC/ReBAC relacional).
 - Auditoría de acciones sensibles.
-- Paneles y reportes operativos.
+- **Centro de Inteligencia Clínica**: Reportes epidemiológicos MPPS (EPI-12 Semanal, EPI-15 Mensual) y métricas de ausentismo.
 
 ## Arranque rápido
 
@@ -45,6 +47,7 @@ cd backend
 npm install
 npm run prisma:push
 npm run prisma:generate
+# Genera 60+ pacientes, 180+ consultas reales y usuarios (usando Faker)
 npm run seed
 npm run dev
 ```

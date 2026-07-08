@@ -37,7 +37,7 @@ Seguridad: guardar JWT_SECRET y ENCRYPTION_KEY como secretos seguros y no subirl
 1. Activar Node 24: `nvm install 24 && nvm use 24`
 2. Instalar dependencias: `cd backend && npm install`
 3. Generar Prisma y BD: `npx prisma generate && npx prisma db push`
-4. Sembrar datos de ejemplo: `npm run seed`
+4. Sembrar datos de ejemplo: `npm run seed` (Ejecuta `seed-realistic.js` que genera decenas de pacientes y consultas con Faker, respetando el cifrado).
 5. Levantar servidor: `npm run dev` o `node index.js`
 6. Abrir docs: `http://localhost:3000/docs`
 
@@ -61,9 +61,10 @@ Enviar en header: `Authorization: Bearer <token>`
 ---
 
 ## Flujo de Roles y Seguridad
-- Roles: ADMIN, MEDICO.
+- Roles: ADMIN, MEDICO, ENFERMERO.
 - RBAC: middleware `authorize(['ROLE'])` protege rutas por rol.
 - ReBAC (relacional): `validatePatientAccess` verifica si el médico está autorizado para un paciente (medicoPrincipal, colaborador en consultas, o historial de consultas).
+- **Autoría Clínica Estricta**: Incluso si un médico es colaborador y tiene acceso de lectura a la historia, la UI restringe la modificación de consultas y notas clínicas estrictamente a su creador original (`doctorId`).
 - ADMIN: separado — por política no puede ver datos clínicos (se aplica restricción explícita en authorize salvo para operaciones administrativas como DELETE).
 
 ---
