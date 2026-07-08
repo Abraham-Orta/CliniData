@@ -1,4 +1,6 @@
 const prisma = require('../config/database');
+const { audit } = require('../utils/auditLogger');
+
 
 /**
  * Middleware para validar el acceso clínico a expedientes de pacientes (ReBAC).
@@ -45,16 +47,23 @@ const validatePatientAccess = async (req, res, next) => {
   }
 
   try {
-    // 2. Capa de Seguridad: Validar relación entre el Médico y el Paciente
+    // 2. Capa de Seguridad: Validar relación
+    // Los enfermeros pueden acceder a todos los pacientes de su clínica
+    const baseWhere = { id: pacienteId };
+    
+    if (rol === 'ENFERMERO') {
+      baseWhere.clinicaId = req.user.clinicaId;
+    } else {
+      baseWhere.OR = [
+        { medicoPrincipalId: medicoId }, 
+        { consultas: { some: { medicoId: medicoId } } }, 
+        { consultas: { some: { colaboradores: { some: { medicoId: medicoId } } } } }, 
+        { citas: { some: { medicoId: medicoId } } }
+      ];
+    }
+
     const tieneAcceso = await prisma.paciente.findFirst({
-      where: {
-        id: pacienteId,
-        OR: [
-          { medicoPrincipalId: medicoId }, // ¿Es el médico principal?
-          { consultas: { some: { medicoId: medicoId } } }, // ¿Ha atendido alguna consulta?
-          { consultas: { some: { colaboradores: { some: { medicoId: medicoId } } } } } // ¿Es colaborador en alguna consulta?
-        ]
-      }
+      where: baseWhere
     });
 
     if (!tieneAcceso) {
@@ -144,8 +153,9 @@ const validateConsultaAccess = async (req, res, next) => {
     const esMedicoConsulta = consulta.medicoId === medicoId;
     const esColaborador = (consulta.colaboradores || []).some(c => c.medicoId === medicoId);
     const esMedicoPrincipal = consulta.paciente && consulta.paciente.medicoPrincipalId === medicoId;
+    const esEnfermeroClinica = rol === 'ENFERMERO' && consulta.paciente?.clinicaId === req.user.clinicaId;
 
-    if (!esMedicoConsulta && !esColaborador && !esMedicoPrincipal) {
+    if (!esMedicoConsulta && !esColaborador && !esMedicoPrincipal && !esEnfermeroClinica) {
       try {
         await prisma.auditoria.create({
           data: {

@@ -8,10 +8,10 @@ const authorize = require('../middleware/authorize');
 router.use(auth);
 
 // List / filter appointments
-router.get('/', authorize(['ADMIN', 'MEDICO']), controller.listAppointments);
-router.get('/:id', authorize(['ADMIN', 'MEDICO']), controller.getAppointment);
-router.post('/', authorize(['ADMIN', 'MEDICO']), controller.createAppointment);
-router.put('/:id', authorize(['ADMIN', 'MEDICO']), controller.updateAppointment);
-router.delete('/:id', authorize(['ADMIN', 'MEDICO']), controller.deleteAppointment);
+router.get('/', authorize(['ADMIN', 'MEDICO', 'ENFERMERO']), controller.listAppointments);
+router.get('/:id', authorize(['ADMIN', 'MEDICO', 'ENFERMERO']), controller.getAppointment);
+router.post('/', authorize(['ADMIN', 'MEDICO', 'ENFERMERO']), controller.createAppointment);
+router.put('/:id', authorize(['ADMIN', 'MEDICO', 'ENFERMERO']), controller.updateAppointment);
+router.delete('/:id', authorize(['ADMIN', 'MEDICO', 'ENFERMERO']), controller.deleteAppointment);
 
 module.exports = router;

@@ -29,7 +29,7 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // --- CAPA 2 SEGURIDAD: Rate Limiting para evitar fuerza bruta y abuso ---
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Limita cada IP a 100 peticiones por ventana
+  max: 10000, // Aumentado para desarrollo
   message: { error: 'Demasiadas peticiones desde esta dirección IP. Intente de nuevo en 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -37,7 +37,7 @@ const generalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 20, // Limita a 20 intentos de login/registro cada 15 minutos
+  max: 5000, // Aumentado para desarrollo
   message: { error: 'Demasiados intentos de autenticación. Intente de nuevo en 15 minutos.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -56,6 +56,11 @@ app.use('/api/appointments', require('./src/routes/appointments'));
 app.use('/api/waitlist', require('./src/routes/waitlist'));
 app.use('/api/dashboard', require('./src/routes/dashboard'));
 app.use('/api/auditorias', require('./src/routes/auditorias'));
+app.use('/api/colaboradores', require('./src/routes/colaboradores'));
+app.use('/api/adjuntos', require('./src/routes/adjuntos'));
+
+// Servir la carpeta de uploads estáticamente para que el frontend pueda descargar los adjuntos
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Swagger UI (OpenAPI docs)
 try {

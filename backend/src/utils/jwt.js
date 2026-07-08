@@ -4,7 +4,7 @@ const generateToken = (userId, role, clinicaId) => {
   const payload = { userId, role };
   if (clinicaId) payload.clinicaId = clinicaId;
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRY || '7d'
+    expiresIn: process.env.JWT_EXPIRY || '2h'
   });
 };
 

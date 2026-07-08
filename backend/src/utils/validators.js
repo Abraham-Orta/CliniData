@@ -5,7 +5,7 @@ const userSchema = z.object({
   nombre: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(50),
   apellido: z.string().min(2, 'El apellido debe tener al menos 2 caracteres').max(50),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-  rol: z.enum(['ADMIN', 'MEDICO']).optional()
+  rol: z.enum(['ADMIN', 'MEDICO', 'ENFERMERO']).optional()
 });
 
 const loginSchema = z.object({

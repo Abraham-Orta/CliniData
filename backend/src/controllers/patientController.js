@@ -1,16 +1,24 @@
 const { patientSchema } = require('../utils/patientValidators');
 const prisma = require('../config/database');
-const { generateBlindIndex, encrypt, decrypt } = require('../utils/securityHelper');
+const { generateBlindIndex, encrypt } = require('../utils/securityHelper');
+const { audit } = require('../utils/auditLogger');
+
 
 function decryptPatient(p) {
-  if (!p) return p;
+  if (!p) return null;
+  // Note: Prisma extension in database.js already decrypts all encrypted fields.
+  // This function only needs to compute derived fields (teamCount).
+  const allColabs = new Set();
+  if (p.consultas) {
+    p.consultas.forEach(c => {
+      if (c.colaboradores) {
+        c.colaboradores.forEach(col => allColabs.add(col.medicoId));
+      }
+    });
+  }
   return {
     ...p,
-    nombre: decrypt(p.nombre),
-    apellido: decrypt(p.apellido),
-    documentoIdentidad: decrypt(p.documentoIdentidad),
-    telefono: decrypt(p.telefono),
-    email: decrypt(p.email)
+    teamCount: 1 + allColabs.size
   };
 }
 
@@ -60,7 +68,8 @@ const getAllPatients = async (req, res, next) => {
       // Try document (blind index) match first - fast and exact
       const searchDniHash = generateBlindIndex(search);
       const matchedPatient = await prisma.paciente.findFirst({
-        where: { AND: [baseWhere, { documentoIdentidadHash: searchDniHash }] }
+        where: { AND: [baseWhere, { documentoIdentidadHash: searchDniHash }] },
+        include: { consultas: { include: { colaboradores: true } } }
       });
 
       if (matchedPatient) {
@@ -70,7 +79,7 @@ const getAllPatients = async (req, res, next) => {
         // No exact doc match: search by nombre/apellido in decrypted data.
         // To avoid decrypting entire DB, restrict by baseWhere (access + filters) and cap results to a reasonable max.
         const MAX_DECRYPT = 1000; // safety cap
-        const allAccessible = await prisma.paciente.findMany({ where: baseWhere, orderBy: { creadoEn: 'desc' }, take: MAX_DECRYPT });
+        const allAccessible = await prisma.paciente.findMany({ where: baseWhere, orderBy: { creadoEn: 'desc' }, take: MAX_DECRYPT, include: { consultas: { include: { colaboradores: true } } } });
 
         const decrypted = allAccessible.map(decryptPatient);
         const searchTerm = search.toLowerCase();
@@ -89,7 +98,7 @@ const getAllPatients = async (req, res, next) => {
       // No free-text search: apply pagination server-side using baseWhere
       const skip = (page - 1) * limit;
       const [rows, count] = await Promise.all([
-        prisma.paciente.findMany({ where: baseWhere, skip, take: limit, orderBy: { creadoEn: 'desc' } }),
+        prisma.paciente.findMany({ where: baseWhere, skip, take: limit, orderBy: { creadoEn: 'desc' }, include: { consultas: { include: { colaboradores: true } } } }),
         prisma.paciente.count({ where: baseWhere })
       ]);
 
@@ -97,7 +106,9 @@ const getAllPatients = async (req, res, next) => {
       total = count;
     }
 
+    await audit(req, 'VER_LISTA_PACIENTES', `Consultados ${patients.length} pacientes (página ${page}, búsqueda: "${search || 'ninguna'}")`);
     res.json({ data: patients, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+
   } catch (err) {
     next(err);
   }
@@ -110,10 +121,12 @@ const getPatient = async (req, res, next) => {
       return res.json(req.paciente);
     }
 
-    const patient = await prisma.paciente.findUnique({ where: { id: req.params.id } });
+    const patient = await prisma.paciente.findUnique({ where: { id: req.params.id }, include: { consultas: { include: { colaboradores: true } } } });
     if (!patient) return res.status(404).json({ error: 'Paciente no encontrado.' });
+    const result = decryptPatient(patient);
+    await audit(req, 'VER_HISTORIAL_PACIENTE', `Acceso al expediente del paciente ID: ${req.params.id}`);
+    res.json(result);
 
-    res.json(decryptPatient(patient));
   } catch (err) {
     next(err);
   }
@@ -151,7 +164,8 @@ const createPatient = async (req, res, next) => {
 
     const patient = await prisma.paciente.create({ data: toStore });
 
-    await prisma.auditoria.create({ data: { accion: 'CREAR_PACIENTE', detalles: `Médico creó el expediente del paciente ID: ${patient.id}`, ipAddress: req.ip || '127.0.0.1', usuarioId: medicoId } }).catch(() => null);
+    await audit(req, 'CREAR_PACIENTE', `Médico creó el expediente del paciente ID: ${patient.id}`);
+
 
     res.status(201).json(decryptPatient(patient));
   } catch (err) {
@@ -182,7 +196,8 @@ const updatePatient = async (req, res, next) => {
 
     const patient = await prisma.paciente.update({ where: { id: patientId }, data });
 
-    await prisma.auditoria.create({ data: { accion: 'ACTUALIZAR_PACIENTE', detalles: `Médico actualizó el expediente del paciente ID: ${patient.id}`, ipAddress: req.ip || '127.0.0.1', usuarioId: req.userId } }).catch(() => null);
+    await audit(req, 'ACTUALIZAR_PACIENTE', `Médico actualizó el expediente del paciente ID: ${patient.id}`);
+
 
     res.json(decryptPatient(patient));
   } catch (err) {
@@ -198,7 +213,8 @@ const deletePatient = async (req, res, next) => {
 
     await prisma.paciente.delete({ where: { id: patientId } });
 
-    await prisma.auditoria.create({ data: { accion: 'ELIMINAR_PACIENTE', detalles: `Administrador eliminó físicamente el expediente del paciente ID: ${patientId}`, ipAddress: req.ip || '127.0.0.1', usuarioId: req.userId } }).catch(() => null);
+    await audit(req, 'ELIMINAR_PACIENTE', `Usuario eliminó físicamente el expediente del paciente ID: ${patientId}`);
+
 
     res.status(204).end();
   } catch (err) {

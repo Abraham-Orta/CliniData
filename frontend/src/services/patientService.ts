@@ -15,7 +15,10 @@ type ApiPatientListResponse = {
 function splitName(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const nombre = parts[0] || 'Paciente';
-  const apellido = parts.slice(1).join(' ') || 'SinApellido';
+  let apellido = parts.slice(1).join(' ');
+  if (!apellido || apellido.length < 2) {
+    apellido = 'Sin Apellido';
+  }
   return { nombre, apellido };
 }
 
@@ -59,13 +62,9 @@ export const patientService = {
     }
 
     const total = response.meta?.total ?? filtered.length;
-    const startIndex = (page - 1) * LIMIT;
-    const endIndex = startIndex + LIMIT;
-    const result = filtered.slice(startIndex, endIndex);
-
     return {
-      patients: result,
-      hasMore: response.meta?.totalPages ? page < response.meta.totalPages : endIndex < total
+      patients: filtered,
+      hasMore: response.meta?.totalPages ? page < response.meta.totalPages : filtered.length >= LIMIT
     };
   },
 
@@ -83,6 +82,28 @@ export const patientService = {
 
     const created = await apiClient.post<any>('/patients', payload);
     const mapped = apiPatientToUi(created);
+    return {
+      ...mapped,
+      condition: data.condition || mapped.condition,
+      status: data.status || mapped.status,
+      bloodType: data.bloodType || mapped.bloodType,
+      allergies: data.allergies || mapped.allergies
+    };
+  },
+
+  updatePatient: async (id: string, data: Partial<ExtendedPatient> & { documentId?: string }) => {
+    const payload: any = {};
+    if (data.name) {
+      const { nombre, apellido } = splitName(data.name);
+      payload.nombre = nombre;
+      payload.apellido = apellido;
+    }
+    if (data.documentId) payload.documentoIdentidad = data.documentId;
+    if (data.age) payload.fechaNacimiento = getBirthDateFromAge(data.age);
+    if (data.phone !== undefined) payload.telefono = data.phone || null;
+    
+    const updated = await apiClient.put<any>(`/patients/${id}`, payload);
+    const mapped = apiPatientToUi(updated);
     return {
       ...mapped,
       condition: data.condition || mapped.condition,

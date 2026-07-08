@@ -5,27 +5,33 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 12 bytes para AES-GCM
 const KEY_LENGTH = 32; // 256 bits
 
-/**
- * Obtiene la clave de cifrado a partir de las variables de entorno.
- * Si no está configurada, genera una clave determinista para desarrollo y muestra un aviso.
- */
+// Cache the derived key for the lifetime of the process.
+// scryptSync is intentionally slow (it's a password-hashing KDF).
+// Calling it on every encrypt/decrypt operation is the main performance bottleneck.
+let _cachedKey = null;
+
 function getEncryptionKey() {
+  if (_cachedKey) return _cachedKey;
+
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('CRITICAL: ENCRYPTION_KEY must be defined in production!');
     }
-    // Clave de desarrollo determinista
-    return crypto.scryptSync('development_default_secure_key_123456', 'salt', KEY_LENGTH);
+    // Deterministic dev key
+    _cachedKey = crypto.scryptSync('development_default_secure_key_123456', 'salt', KEY_LENGTH);
+    return _cachedKey;
   }
 
-  // Si la clave ya tiene 64 caracteres hex (32 bytes), la cargamos directamente
+  // If the key is already 64 hex chars (32 bytes), load it directly
   if (/^[0-9a-fA-F]{64}$/.test(key)) {
-    return Buffer.from(key, 'hex');
+    _cachedKey = Buffer.from(key, 'hex');
+    return _cachedKey;
   }
 
-  // De lo contrario, derivamos una clave de 32 bytes de forma segura
-  return crypto.scryptSync(key, 'clinidata-salt', KEY_LENGTH);
+  // Otherwise derive a 32-byte key — only once
+  _cachedKey = crypto.scryptSync(key, 'clinidata-salt', KEY_LENGTH);
+  return _cachedKey;
 }
 
 /**

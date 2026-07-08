@@ -44,18 +44,23 @@ export const appointmentService = {
     return appointments
       .map((a) => apiAppointmentToUi(a))
       .filter((a) => a.status !== 'cancelada')
-      .slice(0, 3);
+      .sort((a, b) => {
+        // Confirmada = En Sala de Espera / Listo para doctor
+        if (a.status === 'confirmada' && b.status !== 'confirmada') return -1;
+        if (b.status === 'confirmada' && a.status !== 'confirmada') return 1;
+        // Pendiente = Agendado pero no ha llegado
+        if (a.status === 'pendiente' && b.status !== 'pendiente') return -1;
+        if (b.status === 'pendiente' && a.status !== 'pendiente') return 1;
+        // Ordenar por hora si tienen el mismo estado
+        return a.time.localeCompare(b.time);
+      })
+      .slice(0, 10);
   },
 
-  getAppointmentsByDate: async (date: string, doctorName: string) => {
+  getAppointmentsByDate: async (date: string) => {
     const targetDate = new Date(`${date}T00:00:00`);
     const { since, until } = isoDayBounds(targetDate);
     const params = new URLSearchParams({ since, until });
-
-    if (doctorName !== 'Todos') {
-      const medicoId = doctorIdFromSession();
-      if (medicoId) params.set('medicoId', medicoId);
-    }
 
     const appointments = await apiClient.get<ApiAppointment[]>(`/appointments?${params.toString()}`);
     return appointments.map((a) => apiAppointmentToUi(a));

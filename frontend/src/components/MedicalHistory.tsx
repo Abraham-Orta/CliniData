@@ -2,16 +2,21 @@ import React, { useState, useEffect } from "react";
 import { 
   User, Phone, MapPin, Droplets, AlertCircle, Edit3, 
   Calendar, Clock, Pill, FileText, Activity, 
-  Download, Plus, ArrowLeft, Users, Trash2, ShieldAlert, ChevronDown, Loader2, X
+  Download, Plus, ArrowLeft, Users, Trash2, ShieldAlert, ChevronDown, Loader2, X, FileUp, File as FileIcon 
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { type Patient } from "./PatientCard";
 import { ShareModal } from "./ShareModal"; 
+import { ReferralModal } from "./ReferralModal";
+
 import { useAuth } from "../context/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { visitService } from "../services/visitService";
+import { patientService } from "../services/patientService";
 import { appointmentService } from "../services/appointmentService";
+import { colaboradorService } from "../services/colaboradorService";
+import { adjuntoService } from "../services/adjuntoService";
 
 // ==========================================
 // 1. INTERFACES Y CONFIGURACIÓN
@@ -68,6 +73,8 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
   const [currentPatient, setCurrentPatient] = useState<Patient>(patient);
   const [medicalTeam, setMedicalTeam] = useState<any[]>([{ id: CURRENT_USER_ID, name: CURRENT_USER_NAME, specialty: CURRENT_USER_SPECIALTY, isPrimary: true }]);
   const [patientVisits, setPatientVisits] = useState<any[]>([]);
+  const [adjuntos, setAdjuntos] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { isLoading: isLoadingVisits, execute: loadVisits } = useApi(async () => {
     const data = await visitService.getVisitsByPatient(currentPatient.id);
@@ -76,6 +83,23 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
 
   useEffect(() => {
     loadVisits();
+    
+    colaboradorService.getEquipoPaciente(currentPatient.id).then(equipo => {
+      if (equipo.length > 0) {
+        setMedicalTeam(equipo.map((e: any) => ({
+          id: e.id,
+          name: `${e.nombre} ${e.apellido}`,
+          specialty: 'Médico',
+          isPrimary: e.rolEnCaso === 'Médico Principal',
+          reason: e.rolEnCaso
+        })));
+      }
+    }).catch(console.error);
+
+    adjuntoService.getAdjuntosPaciente(currentPatient.id).then(data => {
+      setAdjuntos(data);
+    }).catch(console.error);
+
   }, [currentPatient.id]);
   
   // --- ESTADO Y EFECTO DE NAVEGACIÓN DE FOCO ---
@@ -106,13 +130,14 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
   // Modales
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [isBloodOpen, setIsBloodOpen] = useState(false);
+  const [isBloodOpen, setIsBloodOpen] = useState(false); 
   const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
   const [isVisitTypeOpen, setIsVisitTypeOpen] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
 
   // Formularios pre-cargados
-  const [editForm, setEditForm] = useState({ name: currentPatient.name, age: currentPatient.age.toString(), condition: currentPatient.condition, status: currentPatient.status, phone: currentPatient.phone || "", location: currentPatient.location || "", bloodType: currentPatient.bloodType || "O+", allergies: currentPatient.allergies || "" });
-  const [visitForm, setVisitForm] = useState({ id: "", visitType: "rutina", rawDate: getTodayStr(), rawTime: "", diagnosis: "", notes: "", prescriptions: "" });
+  const [editForm, setEditForm] = useState({ name: currentPatient.name, age: currentPatient.age.toString(), condition: currentPatient.condition, status: currentPatient.status, phone: currentPatient.phone || "", location: currentPatient.location || "", bloodType: currentPatient.bloodType || "O+", allergies: currentPatient.allergies || "", documentId: "" });
+  const [visitForm, setVisitForm] = useState({ id: "", visitType: "rutina", rawDate: getTodayStr(), rawTime: "", diagnosis: "", notes: "", prescriptions: "", file: null as File | null });
 
   // === EFECTO: AUTO-APERTURA (FLUJO CLÍNICO) ===
   useEffect(() => {
@@ -132,7 +157,7 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
         visitType: activeAppointment.type,
         rawDate: activeAppointment.date,
         rawTime: rawH,
-        diagnosis: "", notes: "", prescriptions: ""
+        diagnosis: "", notes: "", prescriptions: "", file: null
       });
       setIsVisitModalOpen(true);
     }
@@ -140,10 +165,10 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
 
   // Manejo del scroll del body al abrir modales
   useEffect(() => {
-    if (isEditModalOpen || isShareModalOpen || isVisitModalOpen || doctorToRemove !== null) document.body.style.overflow = "hidden";
+    if (isEditModalOpen || isShareModalOpen || isVisitModalOpen || isReferralModalOpen || doctorToRemove !== null) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "unset";
     return () => { document.body.style.overflow = "unset"; };
-  }, [isEditModalOpen, isShareModalOpen, isVisitModalOpen, doctorToRemove]);
+  }, [isEditModalOpen, isShareModalOpen, isVisitModalOpen, isReferralModalOpen, doctorToRemove]);
 
   // --- MANEJADORES DE EXPORTACIÓN Y MODALES ---
   const handleExportPDF = () => {
@@ -202,7 +227,17 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
   }, []);
   
   // --- MANEJADORES DE PERFIL ---
-  const openProfileModal = () => { setEditForm({ name: currentPatient.name, age: currentPatient.age.toString(), condition: currentPatient.condition, status: currentPatient.status, phone: currentPatient.phone || "", location: currentPatient.location || "", bloodType: currentPatient.bloodType || "O+", allergies: currentPatient.allergies || "" }); setIsStatusOpen(false); setIsBloodOpen(false); setIsEditModalOpen(true); };
+  const openProfileModal = () => { 
+    // Necesitamos hacer fetch del paciente real para tener el DNI descifrado si no lo tenemos en UI
+    patientService.getPatientById(currentPatient.id).then((realPatient: any) => {
+      setEditForm({ name: currentPatient.name, age: currentPatient.age.toString(), condition: currentPatient.condition, status: currentPatient.status, phone: currentPatient.phone || "", location: currentPatient.location || "", bloodType: currentPatient.bloodType || "O+", allergies: currentPatient.allergies || "", documentId: realPatient.documentoIdentidad || "" });
+    }).catch(console.error);
+    
+    setEditForm({ name: currentPatient.name, age: currentPatient.age.toString(), condition: currentPatient.condition, status: currentPatient.status, phone: currentPatient.phone || "", location: currentPatient.location || "", bloodType: currentPatient.bloodType || "O+", allergies: currentPatient.allergies || "", documentId: "" }); 
+    setIsStatusOpen(false); 
+    setIsBloodOpen(false); 
+    setIsEditModalOpen(true); 
+  };
   
   const handleProfileSubmit = async (e: React.FormEvent) => { 
     e.preventDefault(); 
@@ -210,7 +245,18 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
 
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulando latencia de red
+      await patientService.updatePatient(currentPatient.id, {
+        name: editForm.name,
+        age: parseInt(editForm.age) || currentPatient.age,
+        phone: editForm.phone,
+        documentId: editForm.documentId,
+        condition: editForm.condition,
+        status: editForm.status as any,
+        bloodType: editForm.bloodType,
+        allergies: editForm.allergies
+      });
+      // La info local se actualizará aunque no esté en DB persistida (condición, status)
+      const initials = editForm.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
       setCurrentPatient({ 
         ...currentPatient, 
         name: editForm.name, 
@@ -221,23 +267,59 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
         location: editForm.location, 
         bloodType: editForm.bloodType, 
         allergies: editForm.allergies, 
-        initials: editForm.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase() 
+        initials
       }); 
       setIsEditModalOpen(false); 
     } catch (err) {
-      console.error(err);
+      console.error("Error al actualizar paciente:", err);
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  // --- MANEJADORES DE EQUIPO MÉDICO ---
-  const handleAssignDoctors = (assignments: any[]) => { const newMembers = assignments.map(a => { return { id: a.doctorId, name: a.name, specialty: a.specialty, isPrimary: false, reason: a.reason }; }); setMedicalTeam(prev => { const filtered = prev.filter(p => !assignments.some(a => a.doctorId === p.id)); return [...filtered, ...newMembers]; }); };
+  // --- MANEJADORES DE EQUIPO MÉDICO Y ADJUNTOS ---
+  const handleAssignDoctors = async (assignments: any[]) => { 
+    for (const assignment of assignments) {
+      try {
+        await colaboradorService.asignarColaborador(currentPatient.id, assignment.doctorId);
+      } catch (err) { console.error(err); }
+    }
+    const equipo = await colaboradorService.getEquipoPaciente(currentPatient.id);
+    setMedicalTeam(equipo.map((e: any) => ({
+      id: e.id,
+      name: `${e.nombre} ${e.apellido}`,
+      specialty: 'Médico',
+      isPrimary: e.rolEnCaso === 'Médico Principal',
+      reason: e.rolEnCaso
+    })));
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const consultaId = patientVisits.length > 0 ? patientVisits[0].id : null;
+    if (!consultaId) {
+      alert("El paciente debe tener al menos una visita clínica registrada para poder adjuntar archivos.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const newAdjunto = await adjuntoService.uploadAdjunto(consultaId, file);
+      setAdjuntos([newAdjunto, ...adjuntos]);
+    } catch (err) {
+      console.error(err);
+      alert("Error al subir archivo. Verifica que backend esté corriendo y multer instalado.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
   const confirmRemoveDoctor = () => { if (doctorToRemove) { setMedicalTeam(prev => prev.filter(doc => doc.id !== doctorToRemove.id)); setDoctorToRemove(null); } };
   
   // --- MANEJADORES DE VISITAS ---
-  const openNewVisitModal = () => { setVisitForm({ id: "", visitType: "rutina", rawDate: getTodayStr(), rawTime: "", diagnosis: "", notes: "", prescriptions: "" }); setIsVisitTypeOpen(false); setIsVisitModalOpen(true); };
-  const openEditVisitModal = (record: VisitRecord) => { setVisitForm({ id: record.id, visitType: record.visitType, rawDate: record.rawDate, rawTime: record.rawTime, diagnosis: record.diagnosis, notes: record.notes, prescriptions: record.prescriptions.join(", ") }); setIsVisitTypeOpen(false); setIsVisitModalOpen(true); };
+  const openNewVisitModal = () => { setVisitForm({ id: "", visitType: "rutina", rawDate: getTodayStr(), rawTime: "", diagnosis: "", notes: "", prescriptions: "", file: null }); setIsVisitTypeOpen(false); setIsVisitModalOpen(true); };
+  const openEditVisitModal = (record: VisitRecord) => { setVisitForm({ id: record.id, visitType: record.visitType, rawDate: record.rawDate, rawTime: record.rawTime, diagnosis: record.diagnosis, notes: record.notes, prescriptions: record.prescriptions.join(", "), file: null }); setIsVisitTypeOpen(false); setIsVisitModalOpen(true); };
 
   const handleVisitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,15 +334,30 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
       const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
       const dateStr = `${d.getDate()} ${months[d.getMonth()]}, ${d.getFullYear()}`;
       const dayStr = days[d.getDay()];
-      let [h, m] = visitForm.rawTime.split(':'); let hours = parseInt(h); const ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12; const timeStr = `${hours}:${m} ${ampm}`;
+      const timeInput = visitForm.rawTime || '09:00';
+      let [h, m] = timeInput.split(':'); 
+      let hours = parseInt(h || '9'); 
+      const ampm = hours >= 12 ? 'PM' : 'AM'; 
+      hours = hours % 12 || 12; 
+      const timeStr = `${hours}:${m || '00'} ${ampm}`;
       const rxArray = visitForm.prescriptions.split(',').map(s => s.trim()).filter(s => s);
 
       if (visitForm.id) {
         // En MVP mockDb, la edición local no se implementó en visitService, pero la mutamos local
         setPatientVisits(patientVisits.map((v: any) => v.id === visitForm.id ? { ...v, rawDate: visitForm.rawDate, rawTime: visitForm.rawTime, date: dateStr, dayOfWeek: dayStr, time: timeStr, diagnosis: visitForm.diagnosis, notes: visitForm.notes, prescriptions: rxArray, visitType: visitForm.visitType } : v));
+        if (visitForm.file) {
+          const newAdjunto = await adjuntoService.uploadAdjunto(visitForm.id, visitForm.file);
+          setAdjuntos(prev => [newAdjunto, ...prev]);
+        }
       } else {
         const newVisit = { patientId: currentPatient.id, rawDate: visitForm.rawDate, rawTime: visitForm.rawTime, date: dateStr, dayOfWeek: dayStr, time: timeStr, diagnosis: visitForm.diagnosis, notes: visitForm.notes, prescriptions: rxArray, visitType: visitForm.visitType, doctorName: CURRENT_USER_NAME, doctorSpecialty: "Medicina Interna" };
         const savedVisit = await visitService.addVisit(newVisit);
+        
+        if (visitForm.file && savedVisit.id) {
+          const newAdjunto = await adjuntoService.uploadAdjunto(savedVisit.id, visitForm.file);
+          setAdjuntos(prev => [newAdjunto, ...prev]);
+        }
+
         setPatientVisits([savedVisit, ...patientVisits]);
         if (setEvents) setEvents([{ id: `ev-${Date.now()}`, type: "prescription", doctorName: CURRENT_USER_NAME, action: "añadió una nueva evolución clínica a", patientName: currentPatient.name, timeAgo: "Justo ahora", read: false, patientId: currentPatient.id }, ...events]);
       }
@@ -272,8 +369,9 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
       }
 
       setIsVisitModalOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(`Error al registrar la visita: ${err.message || 'Error de conexión con el servidor.'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -368,6 +466,40 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
           </div>
         </div>
 
+        {/* ARCHIVOS ADJUNTOS */}
+        <div id="section-attachments" className="w-full rounded-2xl p-6 shadow-sm border bg-white border-slate-100">
+          <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2"><FileIcon size={18} className="text-amber-600" /><h2 className="text-lg font-bold text-slate-900">Archivos Adjuntos</h2><span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 ml-2">{adjuntos.length} Archivos</span></div>
+            
+            <label className="cursor-pointer px-4 py-2.5 flex items-center gap-2 text-amber-700 text-sm font-bold rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-all duration-200">
+              {isUploading ? <><Loader2 size={14} className="animate-spin" /> Subiendo...</> : <><FileUp size={14} strokeWidth={2.5} /> Subir Archivo</>}
+              <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} accept="image/*,application/pdf" />
+            </label>
+          </div>
+          
+          {adjuntos.length === 0 ? (
+            <div className="text-center py-8 text-sm text-slate-500 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+              <FileUp size={32} className="mx-auto text-slate-300 mb-3" />
+              <p>No hay archivos adjuntos.</p>
+              <p className="text-xs mt-1">Sube radiografías, resultados de laboratorio o documentos PDF.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {adjuntos.map((file) => (
+                <a key={file.id} href={`http://localhost:3000/uploads/${file.ruta}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-amber-300 hover:shadow-md transition-all group">
+                  <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <FileIcon size={18} />
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-sm font-bold text-slate-800 truncate group-hover:text-amber-700">{file.nombre}</p>
+                    <p className="text-xs text-slate-400">{(file.size / 1024).toFixed(1)} KB • {new Date(file.creadoEn).toLocaleDateString()}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* LÍNEA DE TIEMPO CLÍNICA */}
         <div id="section-prescriptions" className={`w-full rounded-2xl p-6 transition-colors duration-1000 ${highlightedSection === 'prescriptions' ? 'bg-amber-50 rounded-2xl' : ''}`}>
           <div className="flex items-center justify-between mb-8">
@@ -378,6 +510,9 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
               </div>
               <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all shadow-sm">
                 <Download size={14} /> Exportar
+              </button>
+              <button onClick={() => setIsReferralModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all border border-indigo-200">
+                <Users size={14} /> Referir Especialista
               </button>
               <button onClick={openNewVisitModal} className="px-4 py-2.5 flex items-center gap-2 text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(11,83,148,0.35)] hover:shadow-[0_6px_20px_rgba(11,83,148,0.45)] hover:-translate-y-0.5 bg-gradient-to-r from-[#0B5394] to-[#0E7490] transition-all duration-200"><Plus size={15} /> Nueva Visita</button>
             </div>
@@ -409,7 +544,9 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
                                 <div className="flex items-center gap-2 mb-1 text-sm font-bold text-slate-800"><Calendar size={13} className="text-slate-400" /> {record.dayOfWeek}, {record.date}</div>
                                 <div className="flex items-center gap-2 text-sm text-slate-500"><Clock size={13} className="text-slate-400" /> {record.time}</div>
                               </div>
-                              <button onClick={() => openEditVisitModal(record)} className="p-2 text-slate-400 hover:text-[#0E7490] hover:bg-cyan-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Editar visita"><Edit3 size={18} /></button>
+                              {record.doctorId === CURRENT_USER_ID && (
+                                <button onClick={() => openEditVisitModal(record)} className="p-2 text-slate-400 hover:text-[#0E7490] hover:bg-cyan-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Editar visita"><Edit3 size={18} /></button>
+                              )}
                             </div>
                             <div className="h-px bg-slate-100 mb-4" />
                             <div className="flex items-center gap-3 mb-4">
@@ -429,6 +566,21 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
                                 <p className="text-sm text-amber-900/80 leading-relaxed whitespace-pre-wrap">{record.notes}</p>
                               </div>
                             )}
+                            
+                            {/* ADJUNTOS VINCULADOS A ESTA VISITA */}
+                            {adjuntos.filter(a => a.consultaId === record.id).length > 0 && (
+                              <div className="mb-3">
+                                <div className="flex items-center gap-2 mb-2"><FileIcon size={12} className="text-amber-600" /><p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Archivos Adjuntos</p></div>
+                                <div className="flex flex-col gap-2">
+                                  {adjuntos.filter(a => a.consultaId === record.id).map(a => (
+                                    <a key={a.id} href={`http://localhost:3000/uploads/${a.ruta}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100 text-amber-700 hover:bg-amber-100 transition-colors text-xs font-semibold">
+                                      <FileUp size={14} /> {a.nombre}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {record.prescriptions.length > 0 && (
                               <div>
                                 <div className="flex items-center gap-2 mb-2"><Pill size={12} className="text-slate-400" /><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prescripciones</p></div>
@@ -456,6 +608,7 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
             <div className="flex items-center gap-3 px-6 py-5 bg-gradient-to-r from-[#0B5394] to-[#0E7490] text-white rounded-t-2xl shadow-sm"><Edit3 size={20} /><h3 className="text-lg font-bold">Editar Perfil del Paciente</h3></div>
             <form onSubmit={handleProfileSubmit} className="p-6 flex flex-col gap-4">
               <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Nombre Completo</label><input type="text" required value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF]" /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Documento de Identidad</label><input type="text" value={editForm.documentId} onChange={e => setEditForm({...editForm, documentId: e.target.value})} minLength={5} maxLength={20} className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF]" /></div>
               <div className="flex gap-4">
                 <div className="w-1/3"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label><input type="number" required min="0" value={editForm.age} onChange={e => setEditForm({...editForm, age: e.target.value})} className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF]" /></div>
                 <div className="w-2/3"><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Estado Inicial</label>
@@ -512,6 +665,22 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
               <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Diagnóstico</label><textarea required rows={2} value={visitForm.diagnosis} onChange={e => setVisitForm({...visitForm, diagnosis: e.target.value})} placeholder="Ej. Hipertensión leve..." className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF] resize-none" /></div>
               <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Notas Clínicas</label><textarea rows={3} value={visitForm.notes} onChange={e => setVisitForm({...visitForm, notes: e.target.value})} placeholder="Recomendaciones, observaciones, etc." className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF] resize-none" /></div>
               <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Prescripciones (Separadas por comas)</label><input type="text" value={visitForm.prescriptions} onChange={e => setVisitForm({...visitForm, prescriptions: e.target.value})} placeholder="Ej. Amlodipina 5mg" className="w-full px-4 py-3 border-[1.5px] border-slate-200 rounded-xl text-sm outline-none focus:border-[#0B5394] focus:ring-1 focus:ring-[#0B5394] transition-all bg-[#F8FAFC] focus:bg-[#FAFCFF]" /></div>
+              
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Adjuntar Estudio o Radiografía (Opcional)</label>
+                <div className="flex items-center gap-3">
+                  <label className="cursor-pointer px-4 py-2 flex items-center gap-2 text-[#0E7490] text-sm font-bold rounded-lg border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 transition-all duration-200 w-full justify-center border-dashed">
+                    <FileUp size={16} /> {visitForm.file ? visitForm.file.name : "Seleccionar Archivo"}
+                    <input type="file" className="hidden" onChange={e => setVisitForm({...visitForm, file: e.target.files?.[0] || null})} accept="image/*,application/pdf" />
+                  </label>
+                  {visitForm.file && (
+                    <button type="button" onClick={() => setVisitForm({...visitForm, file: null})} className="p-2 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg shrink-0">
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="flex gap-3 mt-3 pt-5 border-t border-slate-100">
                 <button type="button" onClick={closeVisitModal} disabled={isSubmitting} className="flex-1 py-3 rounded-xl font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Cancelar</button>
                 <button type="submit" disabled={isSubmitting} className="flex-1 py-3 font-bold text-white rounded-xl shadow-[0_4px_14px_rgba(11,83,148,0.35)] hover:shadow-[0_6px_20px_rgba(11,83,148,0.45)] hover:-translate-y-0.5 bg-gradient-to-r from-[#0B5394] to-[#0E7490] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
@@ -539,6 +708,20 @@ export function MedicalHistory({ patient, onBack, globalState, focusSection }: a
           </div>
         </div>
       )}
+      {/* --- MODAL REFERIR A ESPECIALISTA --- */}
+      {isReferralModalOpen && (
+        <ReferralModal
+          onClose={() => setIsReferralModalOpen(false)}
+          patientId={currentPatient.id}
+          patientName={currentPatient.name}
+          onReferralSuccess={() => {
+            if (setEvents) {
+              setEvents([{ id: `ev-${Date.now()}`, type: "appointment", doctorName: CURRENT_USER_NAME, action: "ha referido a un especialista a", patientName: currentPatient.name, timeAgo: "Justo ahora", read: false, patientId: currentPatient.id }, ...events]);
+            }
+          }}
+        />
+      )}
+
     </div>
   );
 }

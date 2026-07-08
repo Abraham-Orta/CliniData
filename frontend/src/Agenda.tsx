@@ -133,7 +133,7 @@ export function Agenda({ globalState, onNavigate, onLogout, onSettings, onProfil
   const [isRescheduling, setIsRescheduling] = useState<string | null>(null);
 
   const { isLoading, error: initialErrorObj, execute: executeLoadAppointments } = useApi(async (dateStr: string) => {
-    const res = await appointmentService.getAppointmentsByDate(dateStr, user?.name || "Dr. Rachel Kim");
+    const res = await appointmentService.getAppointmentsByDate(dateStr);
     setLoadedAppointments(res);
   });
   const hasError = !!initialErrorObj;

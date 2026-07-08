@@ -20,10 +20,10 @@ router.use(authMiddleware);
 
 // Rutas Clínicas de consultas (exclusivas para Médicos)
 // En la creación, el middleware validará el acceso al req.body.pacienteId
-router.post('/', authorize(['MEDICO']), validatePatientAccess, createConsulta);
+router.post('/', authorize(['MEDICO', 'ENFERMERO']), validatePatientAccess, createConsulta);
 
 // Ver historial de consultas de un paciente (req.params.pacienteId)
-router.get('/paciente/:pacienteId', authorize(['MEDICO']), validatePatientAccess, getPacienteHistorial);
+router.get('/paciente/:pacienteId', authorize(['MEDICO', 'ENFERMERO']), validatePatientAccess, getPacienteHistorial);
 
 // Acciones secundarias en consultas creadas
 router.post('/:id/colaboradores', authorize(['MEDICO']), addColaborador);

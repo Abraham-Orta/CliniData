@@ -18,12 +18,12 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Rutas Clínicas: Reservadas para personal médico con validación relacional (ReBAC)
-router.get('/', authorize(['MEDICO']), getAllPatients);
-router.post('/', authorize(['MEDICO']), validate(patientSchema), createPatient);
+router.get('/', authorize(['MEDICO', 'ENFERMERO']), getAllPatients);
+router.post('/', authorize(['MEDICO', 'ENFERMERO']), validate(patientSchema), createPatient);
 
-router.get('/:id', authorize(['MEDICO']), validatePatientAccess, getPatient);
-router.put('/:id', authorize(['MEDICO']), validatePatientAccess, validate(patientSchema), updatePatient);
-router.patch('/:id', authorize(['MEDICO']), validatePatientAccess, validate(patientSchema, { partial: true }), updatePatient);
+router.get('/:id', authorize(['MEDICO', 'ENFERMERO']), validatePatientAccess, getPatient);
+router.put('/:id', authorize(['MEDICO', 'ENFERMERO']), validatePatientAccess, validate(patientSchema), updatePatient);
+router.patch('/:id', authorize(['MEDICO', 'ENFERMERO']), validatePatientAccess, validate(patientSchema, { partial: true }), updatePatient);
 
 // Ruta Administrativa: Borrado de expedientes exclusivo para Administradores
 // Se omite validatePatientAccess para que ADMIN pueda borrar por ID sin ver datos

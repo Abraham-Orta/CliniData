@@ -5,6 +5,9 @@ import { PatientHub } from "./PatientHub";
 import { Agenda } from "./Agenda";
 import { Reports } from "./Reports";
 import { LoginCard } from "./LoginCard"; 
+import { Audits } from "./pages/Audits";
+import { TriageHub } from "./components/TriageHub";
+
 import { MedicalHistory } from "./components/MedicalHistory"; 
 import { AlertTriangle, X, Shield, Bell, Loader2 } from "lucide-react"; 
 import { AppContext } from "./context/AppContext";
@@ -91,19 +94,27 @@ export default function App() {
     navigate(`/patients/${patientId}/history`);
   };
 
+  const getHomeRoute = () => {
+    if (user?.role === 'enfermero') return '/triage';
+    return '/dashboard';
+  };
+
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginCard />} />
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard globalState={globalState} onNavigate={handleNavigate} onLogout={handleLogoutRequest} onSettings={handleSettingsRequest} onProfile={handleProfileRequest} /></ProtectedRoute>} />
+        <Route path="/" element={<Navigate to={getHomeRoute()} replace />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to={getHomeRoute()} replace /> : <LoginCard />} />
+        <Route path="/dashboard" element={<ProtectedRoute>{user?.role === 'enfermero' ? <Navigate to="/triage" replace /> : <Dashboard globalState={globalState} onNavigate={handleNavigate} onLogout={handleLogoutRequest} onSettings={handleSettingsRequest} onProfile={handleProfileRequest} />}</ProtectedRoute>} />
         <Route path="/patients" element={<ProtectedRoute><PatientHub globalState={globalState} onNavigate={handleNavigate} onPatientSelect={globalState.handlePatientSelect} onLogout={handleLogoutRequest} onSettings={handleSettingsRequest} onProfile={handleProfileRequest} /></ProtectedRoute>} />
         <Route path="/patients/:id/history" element={<ProtectedRoute><MedicalHistoryWrapper globalState={globalState} onBack={() => navigate('/patients')} /></ProtectedRoute>} />
         <Route path="/agenda" element={<ProtectedRoute><Agenda globalState={globalState} onNavigate={handleNavigate} onLogout={handleLogoutRequest} onSettings={handleSettingsRequest} onProfile={handleProfileRequest} /></ProtectedRoute>} />
         
         {/* Constructing view catch-all */}
         <Route path="/reports" element={<ProtectedRoute><Reports globalState={globalState} onNavigate={handleNavigate} onLogout={handleLogoutRequest} onSettings={handleSettingsRequest} onProfile={handleProfileRequest} /></ProtectedRoute>} />
+        <Route path="/audits" element={<ProtectedRoute><Audits globalState={globalState} onNavigate={handleNavigate} onLogout={handleLogoutRequest} onSettings={handleSettingsRequest} onProfile={handleProfileRequest} /></ProtectedRoute>} />
+        <Route path="/triage" element={<ProtectedRoute><TriageHub /></ProtectedRoute>} />
       </Routes>
+
 
       {/* MODALS */}
       {isLogoutOpen && (
